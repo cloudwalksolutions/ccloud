@@ -53,5 +53,6 @@ func Merge(path string, entry *api.Config) error {
 	for name, context := range entry.Contexts {
 		cfg.Contexts[name] = context
 	}
+	cfg.CurrentContext = entry.CurrentContext
 	return clientcmd.WriteToFile(*cfg, path)
 }

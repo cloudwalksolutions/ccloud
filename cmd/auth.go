@@ -38,5 +38,9 @@ func auth(c *cobra.Command, region regions.Region) error {
 	if err := whoami.Run(); err != nil {
 		return fmt.Errorf("signing in to %s failed, so your kubeconfig is unchanged: %s", region.Name, strings.TrimSpace(reason.String()))
 	}
-	return kubeconfig.Merge(kubeconfig.Path(), entry)
+	if err := kubeconfig.Merge(kubeconfig.Path(), entry); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(c.OutOrStdout(), "Switched to context %q.\n", region.Context())
+	return err
 }

@@ -53,7 +53,7 @@ var _ = Describe("ccloud clusters auth", func() {
 		Expect(os.ReadFile(kubeconfig)).To(Equal(existing))
 	})
 
-	It("adds the region beside your other clusters, without switching you to it, however often it runs", func() {
+	It("adds the region beside your other clusters and switches you to it, however often it runs", func() {
 		Expect(os.MkdirAll(filepath.Dir(kubeconfig), 0o700)).To(Succeed())
 		Expect(os.WriteFile(kubeconfig, []byte("apiVersion: v1\nkind: Config\ncurrent-context: work\ncontexts:\n- name: work\n  context: {cluster: work, user: work}\nclusters:\n- name: work\n  cluster: {server: https://work.example}\nusers:\n- name: work\n  user: {token: t}\n"), 0o600)).To(Succeed())
 		tool("kubectl", `echo "Username  walker@cloudwalksolutions.io"`)
@@ -63,7 +63,8 @@ var _ = Describe("ccloud clusters auth", func() {
 
 		cfg, err := clientcmd.LoadFromFile(kubeconfig)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(cfg.CurrentContext).To(Equal("work"))
+		Expect(cfg.CurrentContext).To(Equal("ccloud-us-east1"))
+		Expect(out.String()).To(ContainSubstring(`Switched to context "ccloud-us-east1"`))
 		Expect(cfg.Contexts).To(HaveKey("work"))
 		Expect(cfg.Contexts).To(HaveLen(2))
 		cluster := cfg.Clusters[cfg.Contexts["ccloud-us-east1"].Cluster]

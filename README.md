@@ -4,11 +4,11 @@ Reach your apps in the cloudwalk datacenter as yourself.
 
 ```sh
 ccloud clusters auth --region us-central1
-kubectl --context ccloud-us-central1 get pods -n prod-<app>
+kubectl get pods -n prod-<app>
 ```
 
 `clusters auth` signs you in through Cloudflare Access and Google in your browser, then adds a
-`ccloud-<region>` context to your kubeconfig. It never changes your current context. What you may
+`ccloud-<region>` context to your kubeconfig and switches you to it. What you may
 do is decided by the cluster, from your Google Workspace domain: read your apps' namespaces, and
 delete pods in feature environments and CI.
 
