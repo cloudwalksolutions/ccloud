@@ -41,6 +41,5 @@ func auth(c *cobra.Command, region regions.Region) error {
 	if err := kubeconfig.Merge(kubeconfig.Path(), entry); err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(c.OutOrStdout(), "Switched to context %q.\n", region.Context())
-	return err
+	return switched(c, region)
 }

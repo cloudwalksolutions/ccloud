@@ -32,6 +32,13 @@ func clustersCmd() *cobra.Command {
 		}
 		return auth(c, region)
 	}))
+	set := regionCmd(&cobra.Command{
+		Use:     "set-context --region <region> [--namespace <namespace>]",
+		Short:   "Switch kubectl to a region you have signed in to",
+		Example: "  ccloud clusters set-context --region us-central1 --namespace prod-boatload",
+	}, setContext)
+	set.Flags().String("namespace", "", "the namespace kubectl uses there; left as it was when omitted")
+	clusters.AddCommand(set)
 	clusters.AddCommand(regionCmd(&cobra.Command{
 		Use:    "credentials --region <region>",
 		Short:  "kubectl's exec plugin for a ccloud context: the tunnel, then your Google token",

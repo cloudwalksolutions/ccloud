@@ -1,6 +1,7 @@
 package kubeconfig
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -34,6 +35,23 @@ func Entry(region regions.Region, self string) *api.Config {
 	cfg.Contexts[name] = &api.Context{Cluster: name, AuthInfo: name}
 	cfg.CurrentContext = name
 	return cfg
+}
+
+var ErrNoContext = errors.New("no such context")
+
+func Use(path, context, namespace string) error {
+	cfg, err := clientcmd.LoadFromFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("reading %s: %w", path, err)
+	}
+	if cfg == nil || cfg.Contexts[context] == nil {
+		return ErrNoContext
+	}
+	cfg.CurrentContext = context
+	if namespace != "" {
+		cfg.Contexts[context].Namespace = namespace
+	}
+	return clientcmd.WriteToFile(*cfg, path)
 }
 
 func Merge(path string, entry *api.Config) error {
