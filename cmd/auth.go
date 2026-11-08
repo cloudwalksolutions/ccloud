@@ -24,7 +24,7 @@ func auth(c *cobra.Command, region regions.Region) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(scratch)
+	defer func() { _ = os.RemoveAll(scratch) }()
 
 	entry := kubeconfig.Entry(region, self)
 	trial := filepath.Join(scratch, "kubeconfig")

@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"ccloud/internal/google"
 	"ccloud/internal/regions"
 )
 
@@ -16,7 +17,13 @@ func credentials(c *cobra.Command, region regions.Region) error {
 	if err := tunnel(region); err != nil {
 		return err
 	}
-	return nil
+	token := exec.Command("kubectl-oidc_login", "get-token",
+		"--oidc-issuer-url=https://accounts.google.com",
+		"--oidc-client-id="+google.ClientID,
+		"--oidc-client-secret="+google.ClientSecret,
+		"--oidc-extra-scope=email")
+	token.Stdin, token.Stdout, token.Stderr = c.InOrStdin(), c.OutOrStdout(), c.ErrOrStderr()
+	return token.Run()
 }
 
 func tunnel(region regions.Region) error {
@@ -52,6 +59,6 @@ func listening(address string) bool {
 	if err != nil {
 		return false
 	}
-	conn.Close()
+	_ = conn.Close()
 	return true
 }

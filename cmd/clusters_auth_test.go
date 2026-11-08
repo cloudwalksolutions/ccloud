@@ -69,6 +69,8 @@ var _ = Describe("ccloud clusters auth", func() {
 		cluster := cfg.Clusters[cfg.Contexts["ccloud-us-east1"].Cluster]
 		Expect(cluster.Server).To(Equal("https://kubernetes.default.svc.cluster.local"))
 		Expect(cluster.ProxyURL).To(HavePrefix("socks5://127.0.0.1:"))
+		_, err = clientcmd.NewNonInteractiveClientConfig(*cfg, "ccloud-us-east1", &clientcmd.ConfigOverrides{}, nil).ClientConfig()
+		Expect(err).NotTo(HaveOccurred(), "kubectl must accept the context as written")
 		Expect(string(cluster.CertificateAuthorityData)).To(ContainSubstring("BEGIN CERTIFICATE"))
 		Expect(cfg.AuthInfos[cfg.Contexts["ccloud-us-east1"].AuthInfo].Exec.Args).To(Equal([]string{"clusters", "credentials", "us-east1"}))
 		Expect(out.String()).To(ContainSubstring("walker@cloudwalksolutions.io"))
