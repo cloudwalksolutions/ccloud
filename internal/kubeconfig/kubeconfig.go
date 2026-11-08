@@ -27,8 +27,9 @@ func Entry(region regions.Region, self string) *api.Config {
 	cfg.AuthInfos[name] = &api.AuthInfo{Exec: &api.ExecConfig{
 		APIVersion:      "client.authentication.k8s.io/v1",
 		Command:         self,
-		Args:            []string{"clusters", "credentials", region.Name},
-		InteractiveMode: api.IfAvailableExecInteractiveMode,
+		Args:            []string{"clusters", "credentials", "--region", region.Name},
+		InteractiveMode:    api.IfAvailableExecInteractiveMode,
+		ProvideClusterInfo: true,
 	}}
 	cfg.Contexts[name] = &api.Context{Cluster: name, AuthInfo: name}
 	cfg.CurrentContext = name

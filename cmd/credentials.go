@@ -1,20 +1,29 @@
 package cmd
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
+	"net/url"
+	"os"
 	"os/exec"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
+	clientauthentication "k8s.io/client-go/pkg/apis/clientauthentication/v1"
 
 	"ccloud/internal/google"
 	"ccloud/internal/regions"
 )
 
 func credentials(c *cobra.Command, region regions.Region) error {
-	if err := tunnel(region); err != nil {
+	address, err := proxyAddress()
+	if err != nil {
+		return err
+	}
+	if err := tunnel(region, address); err != nil {
 		return err
 	}
 	token := exec.Command("kubectl-oidc_login", "get-token",
@@ -26,8 +35,19 @@ func credentials(c *cobra.Command, region regions.Region) error {
 	return token.Run()
 }
 
-func tunnel(region regions.Region) error {
-	address := fmt.Sprintf("127.0.0.1:%d", region.Port)
+func proxyAddress() (string, error) {
+	var info clientauthentication.ExecCredential
+	if err := json.Unmarshal([]byte(os.Getenv("KUBERNETES_EXEC_INFO")), &info); err != nil || info.Spec.Cluster == nil {
+		return "", errors.New("kubectl runs this for a ccloud context; sign in with ccloud clusters auth")
+	}
+	proxy, err := url.Parse(info.Spec.Cluster.ProxyURL)
+	if err != nil || proxy.Host == "" {
+		return "", fmt.Errorf("the ccloud context has no tunnel proxy; sign in again with ccloud clusters auth")
+	}
+	return proxy.Host, nil
+}
+
+func tunnel(region regions.Region, address string) error {
 	if listening(address) {
 		return nil
 	}

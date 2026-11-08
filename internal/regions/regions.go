@@ -3,6 +3,7 @@ package regions
 import (
 	"embed"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -31,15 +32,14 @@ var all = map[string]Region{
 	"us-east1":    {Name: "us-east1", Host: "k8s.us-east1.cloudwalksolutions.net", Port: 16443},
 }
 
+func Names() []string {
+	return slices.Sorted(maps.Keys(all))
+}
+
 func Find(name string) (Region, error) {
 	region, ok := all[name]
 	if !ok {
-		names := make([]string, 0, len(all))
-		for n := range all {
-			names = append(names, n)
-		}
-		slices.Sort(names)
-		return Region{}, fmt.Errorf("no region %q; the datacenter has %s", name, strings.Join(names, ", "))
+		return Region{}, fmt.Errorf("no region %q; the datacenter has %s", name, strings.Join(Names(), ", "))
 	}
 	return region, nil
 }

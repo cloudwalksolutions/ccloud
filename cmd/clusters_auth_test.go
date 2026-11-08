@@ -47,7 +47,7 @@ var _ = Describe("ccloud clusters auth", func() {
 		Expect(os.WriteFile(kubeconfig, existing, 0o600)).To(Succeed())
 		tool("kubectl", `echo "error: You must be logged in to the server (Unauthorized)" >&2; exit 1`)
 
-		err := run("clusters", "auth", "us-east1")
+		err := run("clusters", "auth", "--region", "us-east1")
 
 		Expect(err).To(MatchError(ContainSubstring("Unauthorized")))
 		Expect(os.ReadFile(kubeconfig)).To(Equal(existing))
@@ -58,8 +58,8 @@ var _ = Describe("ccloud clusters auth", func() {
 		Expect(os.WriteFile(kubeconfig, []byte("apiVersion: v1\nkind: Config\ncurrent-context: work\ncontexts:\n- name: work\n  context: {cluster: work, user: work}\nclusters:\n- name: work\n  cluster: {server: https://work.example}\nusers:\n- name: work\n  user: {token: t}\n"), 0o600)).To(Succeed())
 		tool("kubectl", `echo "Username  walker@cloudwalksolutions.io"`)
 
-		Expect(run("clusters", "auth", "us-east1")).To(Succeed())
-		Expect(run("clusters", "auth", "us-east1")).To(Succeed())
+		Expect(run("clusters", "auth", "--region", "us-east1")).To(Succeed())
+		Expect(run("clusters", "auth", "--region", "us-east1")).To(Succeed())
 
 		cfg, err := clientcmd.LoadFromFile(kubeconfig)
 		Expect(err).NotTo(HaveOccurred())
@@ -72,23 +72,33 @@ var _ = Describe("ccloud clusters auth", func() {
 		_, err = clientcmd.NewNonInteractiveClientConfig(*cfg, "ccloud-us-east1", &clientcmd.ConfigOverrides{}, nil).ClientConfig()
 		Expect(err).NotTo(HaveOccurred(), "kubectl must accept the context as written")
 		Expect(string(cluster.CertificateAuthorityData)).To(ContainSubstring("BEGIN CERTIFICATE"))
-		Expect(cfg.AuthInfos[cfg.Contexts["ccloud-us-east1"].AuthInfo].Exec.Args).To(Equal([]string{"clusters", "credentials", "us-east1"}))
+		exec := cfg.AuthInfos[cfg.Contexts["ccloud-us-east1"].AuthInfo].Exec
+		Expect(exec.Args).To(Equal([]string{"clusters", "credentials", "--region", "us-east1"}))
+		Expect(exec.ProvideClusterInfo).To(BeTrue(), "credentials finds its tunnel through the proxy-url kubectl passes it")
 		Expect(out.String()).To(ContainSubstring("walker@cloudwalksolutions.io"))
 	})
 
 	It("names the tool it needs that this machine lacks", func() {
 		Expect(os.Remove(filepath.Join(bin, "cloudflared"))).To(Succeed())
 
-		err := run("clusters", "auth", "us-east1")
+		err := run("clusters", "auth", "--region", "us-east1")
 
 		Expect(err).To(MatchError(ContainSubstring("cloudflared")))
 		Expect(kubeconfig).NotTo(BeAnExistingFile())
 	})
 
 	It("refuses a region the datacenter does not have, naming the ones it does", func() {
-		err := run("clusters", "auth", "us-west9")
+		err := run("clusters", "auth", "--region", "us-west9")
 
 		Expect(err).To(MatchError(ContainSubstring("us-west9")))
+		Expect(err).To(MatchError(And(ContainSubstring("us-central1"), ContainSubstring("us-east1"))))
+		Expect(kubeconfig).NotTo(BeAnExistingFile())
+	})
+
+	It("asks for a region when given none, showing how to call it and naming the regions", func() {
+		err := run("clusters", "auth")
+
+		Expect(err).To(MatchError(ContainSubstring("ccloud clusters auth --region <region>")))
 		Expect(err).To(MatchError(And(ContainSubstring("us-central1"), ContainSubstring("us-east1"))))
 		Expect(kubeconfig).NotTo(BeAnExistingFile())
 	})
@@ -96,7 +106,7 @@ var _ = Describe("ccloud clusters auth", func() {
 	It("refuses to sign in from a build that carries no Google client", func() {
 		google.ClientID = ""
 
-		err := run("clusters", "auth", "us-east1")
+		err := run("clusters", "auth", "--region", "us-east1")
 
 		Expect(err).To(MatchError(ContainSubstring("built without a Google client")))
 		Expect(kubeconfig).NotTo(BeAnExistingFile())

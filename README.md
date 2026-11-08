@@ -3,7 +3,7 @@
 Reach your apps in the cloudwalk datacenter as yourself.
 
 ```sh
-ccloud clusters auth us-central1
+ccloud clusters auth --region us-central1
 kubectl --context ccloud-us-central1 get pods -n prod-<app>
 ```
 
