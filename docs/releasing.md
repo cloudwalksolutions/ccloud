@@ -8,9 +8,11 @@ release succeeded, so a failed run leaves nothing behind and can be re-run.
 Merges touching only Markdown, `docs/` or `specs/` do not release. Bump minor or major by pushing
 the tag yourself; the next merge patches from it.
 
-Actions secrets, set by hand with `gh secret set <NAME> -R cloudwalksolutions/ccloud`:
+`HOMEBREW_TAP_DEPLOY_KEY`, the tap's write deploy key, is set by devops-admin's Terraform for every
+repo in its `cli_tools`.
 
-- `HOMEBREW_TAP_TOKEN` — a fine-grained PAT with Contents read/write on `homebrew-tap`.
+Actions secrets set by hand with `gh secret set <NAME> -R cloudwalksolutions/ccloud`:
+
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — CloudWalk's Google Desktop OAuth client, the
   audience its API servers trust. Google treats a desktop client's secret as public; it is kept out
   of the repo only so another cloud's build never carries it.
