@@ -1,0 +1,50 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["README.md", "AGENTS.md", "CLAUDE.md", "docs/**", "specs/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Next patch tag
+        id: tag
+        run: |
+          latest=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+          IFS=. read -r major minor patch <<<"${latest:-v0.0.0}"
+          next="$major.$minor.$((patch + 1))"
+          git tag "$next"
+          echo "next=$next" >>"$GITHUB_OUTPUT"
+
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+
+      - name: Push ${{ steps.tag.outputs.next }}
+        run: git push origin "${{ steps.tag.outputs.next }}"
