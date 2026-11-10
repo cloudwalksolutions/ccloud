@@ -48,7 +48,7 @@ homebrew_casks:
     dependencies:
       - formula: kubectl
       - formula: cloudflared
-      - formula: int128/kubelogin/kubelogin
+      - formula: kubelogin
     custom_block: |
       postflight_steps do
         on_macos do
