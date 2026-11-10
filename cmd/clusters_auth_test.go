@@ -102,13 +102,13 @@ var _ = Describe("ccloud clusters auth", func() {
 		Expect(kubeconfig).NotTo(BeAnExistingFile())
 	})
 
-	It("refuses to sign in from a build that carries no Google client", func() {
+	It("refuses to sign in from a build that carries no OIDC client for its cloud", func() {
 		unbuilt := example
 		unbuilt.ClientID = ""
 
 		err := cmd.Run([]string{"clusters", "auth", "--region", "north1"}, out, out, unbuilt)
 
-		Expect(err).To(MatchError(ContainSubstring("built without a Google client")))
+		Expect(err).To(MatchError("this ccloud was built without an OIDC client for the example cloud; install a release build"))
 		Expect(kubeconfig).NotTo(BeAnExistingFile())
 	})
 })

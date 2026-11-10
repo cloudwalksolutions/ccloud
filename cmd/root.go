@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -11,7 +12,7 @@ import (
 func Run(args []string, stdout, stderr io.Writer, home cloud.Cloud) error {
 	root := &cobra.Command{
 		Use:           "ccloud",
-		Short:         "Your apps in the cloudwalk datacenter",
+		Short:         fmt.Sprintf("The developer CLI for your apps in the %s cloud", home.Name),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

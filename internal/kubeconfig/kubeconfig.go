@@ -3,6 +3,7 @@ package kubeconfig
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -60,15 +61,9 @@ func Merge(path string, entry *api.Config) error {
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", path, err)
 	}
-	for name, cluster := range entry.Clusters {
-		cfg.Clusters[name] = cluster
-	}
-	for name, user := range entry.AuthInfos {
-		cfg.AuthInfos[name] = user
-	}
-	for name, context := range entry.Contexts {
-		cfg.Contexts[name] = context
-	}
+	maps.Copy(cfg.Clusters, entry.Clusters)
+	maps.Copy(cfg.AuthInfos, entry.AuthInfos)
+	maps.Copy(cfg.Contexts, entry.Contexts)
 	cfg.CurrentContext = entry.CurrentContext
 	return clientcmd.WriteToFile(*cfg, path)
 }
