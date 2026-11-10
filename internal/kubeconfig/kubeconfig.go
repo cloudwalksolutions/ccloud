@@ -8,27 +8,25 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	api "k8s.io/client-go/tools/clientcmd/api"
 
-	"ccloud/internal/regions"
+	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 )
-
-const apiServer = "https://kubernetes.default.svc.cluster.local"
 
 func Path() string {
 	return clientcmd.NewDefaultClientConfigLoadingRules().GetDefaultFilename()
 }
 
-func Entry(region regions.Region, self string) *api.Config {
+func Entry(home cloud.Cloud, region cloud.Region, self string) *api.Config {
 	cfg := api.NewConfig()
 	name := region.Context()
 	cfg.Clusters[name] = &api.Cluster{
-		Server:                   apiServer,
-		CertificateAuthorityData: region.Authority(),
+		Server:                   home.APIServer,
+		CertificateAuthorityData: region.Authority,
 		ProxyURL:                 fmt.Sprintf("socks5://127.0.0.1:%d", region.Port),
 	}
 	cfg.AuthInfos[name] = &api.AuthInfo{Exec: &api.ExecConfig{
-		APIVersion:      "client.authentication.k8s.io/v1",
-		Command:         self,
-		Args:            []string{"clusters", "credentials", "--region", region.Name},
+		APIVersion:         "client.authentication.k8s.io/v1",
+		Command:            self,
+		Args:               []string{"clusters", "credentials", "--region", region.Name},
 		InteractiveMode:    api.IfAvailableExecInteractiveMode,
 		ProvideClusterInfo: true,
 	}}

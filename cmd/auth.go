@@ -3,19 +3,19 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"strings"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"ccloud/internal/kubeconfig"
-	"ccloud/internal/regions"
+	"github.com/cloudwalksolutions/ccloud/internal/cloud"
+	"github.com/cloudwalksolutions/ccloud/internal/kubeconfig"
 )
 
-func auth(c *cobra.Command, region regions.Region) error {
+func auth(c *cobra.Command, home cloud.Cloud, region cloud.Region) error {
 	self, err := os.Executable()
 	if err != nil {
 		return err
@@ -26,7 +26,7 @@ func auth(c *cobra.Command, region regions.Region) error {
 	}
 	defer func() { _ = os.RemoveAll(scratch) }()
 
-	entry := kubeconfig.Entry(region, self)
+	entry := kubeconfig.Entry(home, region, self)
 	trial := filepath.Join(scratch, "kubeconfig")
 	if err := clientcmd.WriteToFile(*entry, trial); err != nil {
 		return err

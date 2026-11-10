@@ -14,11 +14,10 @@ import (
 	"github.com/spf13/cobra"
 	clientauthentication "k8s.io/client-go/pkg/apis/clientauthentication/v1"
 
-	"ccloud/internal/google"
-	"ccloud/internal/regions"
+	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 )
 
-func credentials(c *cobra.Command, region regions.Region) error {
+func credentials(c *cobra.Command, home cloud.Cloud, region cloud.Region) error {
 	address, err := proxyAddress()
 	if err != nil {
 		return err
@@ -26,11 +25,14 @@ func credentials(c *cobra.Command, region regions.Region) error {
 	if err := tunnel(region, address); err != nil {
 		return err
 	}
-	token := exec.Command("kubectl-oidc_login", "get-token",
-		"--oidc-issuer-url=https://accounts.google.com",
-		"--oidc-client-id="+google.ClientID,
-		"--oidc-client-secret="+google.ClientSecret,
-		"--oidc-extra-scope=email")
+	args := []string{"get-token",
+		"--oidc-issuer-url=" + home.Issuer,
+		"--oidc-client-id=" + home.ClientID,
+		"--oidc-client-secret=" + home.ClientSecret}
+	for _, scope := range home.Scopes {
+		args = append(args, "--oidc-extra-scope="+scope)
+	}
+	token := exec.Command("kubectl-oidc_login", args...)
 	token.Stdin, token.Stdout, token.Stderr = c.InOrStdin(), c.OutOrStdout(), c.ErrOrStderr()
 	return token.Run()
 }
@@ -47,7 +49,7 @@ func proxyAddress() (string, error) {
 	return proxy.Host, nil
 }
 
-func tunnel(region regions.Region, address string) error {
+func tunnel(region cloud.Region, address string) error {
 	if listening(address) {
 		return nil
 	}

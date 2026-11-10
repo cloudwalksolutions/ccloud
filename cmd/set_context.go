@@ -6,11 +6,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"ccloud/internal/kubeconfig"
-	"ccloud/internal/regions"
+	"github.com/cloudwalksolutions/ccloud/internal/cloud"
+	"github.com/cloudwalksolutions/ccloud/internal/kubeconfig"
 )
 
-func setContext(c *cobra.Command, region regions.Region) error {
+func setContext(c *cobra.Command, region cloud.Region) error {
 	namespace, err := c.Flags().GetString("namespace")
 	if err != nil {
 		return err
@@ -25,7 +25,7 @@ func setContext(c *cobra.Command, region regions.Region) error {
 	return switched(c, region)
 }
 
-func switched(c *cobra.Command, region regions.Region) error {
+func switched(c *cobra.Command, region cloud.Region) error {
 	_, err := fmt.Fprintf(c.OutOrStdout(), "Switched to context %q.\n", region.Context())
 	return err
 }

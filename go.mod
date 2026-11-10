@@ -1,4 +1,4 @@
-module ccloud
+module github.com/cloudwalksolutions/ccloud
 
 go 1.27.3
 

@@ -9,8 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"ccloud/cmd"
-	"ccloud/internal/google"
+	"github.com/cloudwalksolutions/ccloud/cmd"
 )
 
 var _ = Describe("ccloud clusters credentials", func() {
@@ -36,33 +35,32 @@ var _ = Describe("ccloud clusters credentials", func() {
 		bin = GinkgoT().TempDir()
 		calls = filepath.Join(GinkgoT().TempDir(), "calls")
 		GinkgoT().Setenv("PATH", bin)
-		google.ClientID, google.ClientSecret = "client.apps.googleusercontent.com", "public-desktop-secret"
 		out = &bytes.Buffer{}
 		address = freeAddress()
-		GinkgoT().Setenv("KUBERNETES_EXEC_INFO", `{"apiVersion":"client.authentication.k8s.io/v1","kind":"ExecCredential","spec":{"interactive":true,"cluster":{"server":"https://kubernetes.default.svc.cluster.local","proxy-url":"socks5://`+address+`"}}}`)
+		GinkgoT().Setenv("KUBERNETES_EXEC_INFO", `{"apiVersion":"client.authentication.k8s.io/v1","kind":"ExecCredential","spec":{"interactive":true,"cluster":{"server":"https://api.example.test","proxy-url":"socks5://`+address+`"}}}`)
 	})
 
-	It("hands kubectl your Google token over the tunnel already open, without opening another", func() {
+	It("hands kubectl your token from the cloud's issuer over the tunnel already open, without opening another", func() {
 		tunnel, err := net.Listen("tcp", address)
 		Expect(err).NotTo(HaveOccurred())
 		DeferCleanup(tunnel.Close)
 		tool("cloudflared", `echo "cloudflared $*" >> `+calls)
 		tool("kubectl-oidc_login", `echo "oidc-login $*" >> `+calls+`; echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
 
-		Expect(cmd.Run([]string{"clusters", "credentials", "--region", "us-east1"}, out, out)).To(Succeed())
+		Expect(cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example)).To(Succeed())
 
 		Expect(out.String()).To(ContainSubstring(`"token":"id-token"`))
 		recorded, _ := os.ReadFile(calls)
 		Expect(string(recorded)).NotTo(ContainSubstring("cloudflared"))
-		Expect(string(recorded)).To(ContainSubstring("get-token --oidc-issuer-url=https://accounts.google.com --oidc-client-id=client.apps.googleusercontent.com --oidc-client-secret=public-desktop-secret"))
+		Expect(string(recorded)).To(ContainSubstring("get-token --oidc-issuer-url=https://issuer.example.test --oidc-client-id=client.example.test --oidc-client-secret=public-desktop-secret --oidc-extra-scope=email"))
 	})
 
 	It("opens the region's tunnel at the kubeconfig's proxy when none is listening, and says so when cloudflared cannot", func() {
 		tool("cloudflared", `echo "cloudflared $*" >> `+calls+`; exit 1`)
 
-		err := cmd.Run([]string{"clusters", "credentials", "--region", "us-east1"}, out, out)
+		err := cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example)
 
 		Expect(err).To(MatchError(ContainSubstring("cloudflared")))
-		Expect(os.ReadFile(calls)).To(ContainSubstring("access tcp --hostname k8s.us-east1.cloudwalksolutions.net --url " + address))
+		Expect(os.ReadFile(calls)).To(ContainSubstring("access tcp --hostname k8s.north1.example.test --url " + address))
 	})
 })

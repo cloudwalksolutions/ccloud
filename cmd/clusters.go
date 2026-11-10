@@ -8,21 +8,20 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"ccloud/internal/google"
-	"ccloud/internal/regions"
+	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 )
 
-func clustersCmd() *cobra.Command {
+func clustersCmd(home cloud.Cloud) *cobra.Command {
 	clusters := &cobra.Command{
 		Use:   "clusters",
 		Short: "Reach a region's Kubernetes cluster as yourself",
 	}
-	clusters.AddCommand(regionCmd(&cobra.Command{
+	clusters.AddCommand(regionCmd(home, &cobra.Command{
 		Use:     "auth --region <region>",
 		Short:   "Sign in to a region's cluster and add it to your kubeconfig as ccloud-<region>",
 		Example: "  ccloud clusters auth --region us-central1",
-	}, func(c *cobra.Command, region regions.Region) error {
-		if google.ClientID == "" {
+	}, func(c *cobra.Command, region cloud.Region) error {
+		if home.ClientID == "" {
 			return errors.New("this ccloud was built without a Google client; build it with the -ldflags in cli/README.md")
 		}
 		for _, tool := range []string{"kubectl", "cloudflared", "kubectl-oidc_login"} {
@@ -30,32 +29,34 @@ func clustersCmd() *cobra.Command {
 				return fmt.Errorf("%s is not on your PATH; ccloud needs kubectl, cloudflared and kubelogin (kubectl-oidc_login)", tool)
 			}
 		}
-		return auth(c, region)
+		return auth(c, home, region)
 	}))
-	set := regionCmd(&cobra.Command{
+	set := regionCmd(home, &cobra.Command{
 		Use:     "set-context --region <region> [--namespace <namespace>]",
 		Short:   "Switch kubectl to a region you have signed in to",
 		Example: "  ccloud clusters set-context --region us-central1 --namespace prod-boatload",
 	}, setContext)
 	set.Flags().String("namespace", "", "the namespace kubectl uses there; left as it was when omitted")
 	clusters.AddCommand(set)
-	clusters.AddCommand(regionCmd(&cobra.Command{
+	clusters.AddCommand(regionCmd(home, &cobra.Command{
 		Use:    "credentials --region <region>",
 		Short:  "kubectl's exec plugin for a ccloud context: the tunnel, then your Google token",
 		Hidden: true,
-	}, credentials))
+	}, func(c *cobra.Command, region cloud.Region) error {
+		return credentials(c, home, region)
+	}))
 	return clusters
 }
 
-func regionCmd(command *cobra.Command, run func(*cobra.Command, regions.Region) error) *cobra.Command {
+func regionCmd(home cloud.Cloud, command *cobra.Command, run func(*cobra.Command, cloud.Region) error) *cobra.Command {
 	var name string
-	command.Flags().StringVar(&name, "region", "", "the datacenter region: "+strings.Join(regions.Names(), ", "))
+	command.Flags().StringVar(&name, "region", "", "the datacenter region: "+strings.Join(home.Names(), ", "))
 	command.Args = cobra.NoArgs
 	command.RunE = func(c *cobra.Command, _ []string) error {
 		if name == "" {
-			return fmt.Errorf("which region? %s --region <region>, where <region> is one of %s", c.CommandPath(), strings.Join(regions.Names(), ", "))
+			return fmt.Errorf("which region? %s --region <region>, where <region> is one of %s", c.CommandPath(), strings.Join(home.Names(), ", "))
 		}
-		region, err := regions.Find(name)
+		region, err := home.Find(name)
 		if err != nil {
 			return err
 		}
