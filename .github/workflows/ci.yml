@@ -41,6 +41,7 @@ jobs:
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
+          install-mode: goinstall
       - name: go mod tidy is a no-op
         run: go mod tidy -diff
 
