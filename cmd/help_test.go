@@ -12,7 +12,7 @@ import (
 var _ = Describe("ccloud --help", func() {
 	help := func(args ...string) string {
 		out := &bytes.Buffer{}
-		Expect(cmd.Run(append(args, "--help"), out, out, example)).To(Succeed())
+		Expect(cmd.Run(append(args, "--help"), out, out, example, "dev")).To(Succeed())
 		return out.String()
 	}
 
@@ -24,5 +24,13 @@ var _ = Describe("ccloud --help", func() {
 		}
 		Expect(help("clusters", "auth")).To(ContainSubstring("ccloud clusters auth --region north1"))
 		Expect(help("clusters", "set-context")).To(ContainSubstring("ccloud clusters set-context --region north1"))
+	})
+
+	It("tells you which release you are running", func() {
+		out := &bytes.Buffer{}
+
+		Expect(cmd.Run([]string{"--version"}, out, out, example, "v0.1.7 (commit abc1234, built 2026-11-09)")).To(Succeed())
+
+		Expect(out.String()).To(Equal("ccloud version v0.1.7 (commit abc1234, built 2026-11-09)\n"))
 	})
 })

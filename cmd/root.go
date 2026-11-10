@@ -9,9 +9,10 @@ import (
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 )
 
-func Run(args []string, stdout, stderr io.Writer, home cloud.Cloud) error {
+func Run(args []string, stdout, stderr io.Writer, home cloud.Cloud, version string) error {
 	root := &cobra.Command{
 		Use:           "ccloud",
+		Version:       version,
 		Short:         fmt.Sprintf("The developer CLI for your apps in the %s cloud", home.Name),
 		SilenceUsage:  true,
 		SilenceErrors: true,

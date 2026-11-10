@@ -20,7 +20,7 @@ var _ = Describe("ccloud clusters auth", func() {
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, example)
+		return cmd.Run(args, out, out, example, "dev")
 	}
 
 	tool := func(name, script string) {
@@ -106,7 +106,7 @@ var _ = Describe("ccloud clusters auth", func() {
 		unbuilt := example
 		unbuilt.ClientID = ""
 
-		err := cmd.Run([]string{"clusters", "auth", "--region", "north1"}, out, out, unbuilt)
+		err := cmd.Run([]string{"clusters", "auth", "--region", "north1"}, out, out, unbuilt, "dev")
 
 		Expect(err).To(MatchError("this ccloud was built without an OIDC client for the example cloud; install a release build"))
 		Expect(kubeconfig).NotTo(BeAnExistingFile())

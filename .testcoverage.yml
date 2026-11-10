@@ -1,0 +1,9 @@
+profile: cover.out
+
+threshold:
+  # Ratchet up as coverage grows, never down.
+  total: 85
+
+exclude:
+  paths:
+    - cmd/ccloud/main.go

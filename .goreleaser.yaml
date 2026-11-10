@@ -1,0 +1,59 @@
+version: 2
+project_name: ccloud
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: ccloud
+    main: ./cmd/ccloud
+    binary: ccloud
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .ShortCommit }}
+      - -X main.date={{ .Date }}
+      - -X github.com/cloudwalksolutions/ccloud/internal/cloud/cloudwalk.ClientID={{ .Env.GOOGLE_CLIENT_ID }}
+      - -X github.com/cloudwalksolutions/ccloud/internal/cloud/cloudwalk.ClientSecret={{ .Env.GOOGLE_CLIENT_SECRET }}
+
+archives:
+  - id: ccloud
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:", "^ci:"]
+
+homebrew_casks:
+  - name: ccloud
+    repository:
+      owner: cloudwalksolutions
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    skip_upload: auto
+    homepage: "https://github.com/cloudwalksolutions/ccloud"
+    description: "The developer CLI for CloudWalk Cloud, or your own Custom Cloud"
+    dependencies:
+      - formula: kubectl
+      - formula: cloudflared
+      - formula: int128/kubelogin/kubelogin
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{" }}staged_path{{ "}}" }}/ccloud"]
+        end
+      end
+
+release:
+  draft: false
+  prerelease: auto

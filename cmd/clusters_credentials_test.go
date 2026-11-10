@@ -47,7 +47,7 @@ var _ = Describe("ccloud clusters credentials", func() {
 		tool("cloudflared", `echo "cloudflared $*" >> `+calls)
 		tool("kubectl-oidc_login", `echo "oidc-login $*" >> `+calls+`; echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
 
-		Expect(cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example)).To(Succeed())
+		Expect(cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")).To(Succeed())
 
 		Expect(out.String()).To(ContainSubstring(`"token":"id-token"`))
 		recorded, _ := os.ReadFile(calls)
@@ -58,7 +58,7 @@ var _ = Describe("ccloud clusters credentials", func() {
 	It("opens the region's tunnel at the kubeconfig's proxy when none is listening, and says so when cloudflared cannot", func() {
 		tool("cloudflared", `echo "cloudflared $*" >> `+calls+`; exit 1`)
 
-		err := cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example)
+		err := cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")
 
 		Expect(err).To(MatchError(ContainSubstring("cloudflared")))
 		Expect(os.ReadFile(calls)).To(ContainSubstring("access tcp --hostname k8s.north1.example.test --url " + address))
