@@ -39,7 +39,9 @@ homebrew_casks:
     repository:
       owner: cloudwalksolutions
       name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      git:
+        url: git@github.com:cloudwalksolutions/homebrew-tap.git
+        private_key: "{{ .Env.HOMEBREW_TAP_DEPLOY_KEY }}"
     skip_upload: auto
     homepage: "https://github.com/cloudwalksolutions/ccloud"
     description: "The developer CLI for CloudWalk Cloud, or your own Custom Cloud"
