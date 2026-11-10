@@ -42,7 +42,7 @@ var _ = Describe("ccloud clusters set-context", func() {
 	It("switches you to a region you signed in to, keeping the namespace you last chose there", func() {
 		write("apiVersion: v1\nkind: Config\ncurrent-context: work\ncontexts:\n- name: work\n  context: {cluster: work, user: work}\n- name: ccloud-north1\n  context: {cluster: ccloud-north1, user: ccloud-north1, namespace: stage-shop}\n")
 
-		Expect(cmd.Run([]string{"clusters", "set-context", "--region", "north1"}, out, out, example, "dev")).To(Succeed())
+		Expect(cmd.Run([]string{"clusters", "set-context", "-r", "north1"}, out, out, example, "dev")).To(Succeed())
 
 		cfg, err := clientcmd.LoadFromFile(kubeconfig)
 		Expect(err).NotTo(HaveOccurred())

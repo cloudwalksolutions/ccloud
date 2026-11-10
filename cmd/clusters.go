@@ -50,7 +50,7 @@ func clustersCmd(home cloud.Cloud) *cobra.Command {
 
 func regionCmd(home cloud.Cloud, command *cobra.Command, run func(*cobra.Command, cloud.Region) error) *cobra.Command {
 	var name string
-	command.Flags().StringVar(&name, "region", "", "the "+home.Name+" region: "+strings.Join(home.Names(), ", "))
+	command.Flags().StringVarP(&name, "region", "r", "", "the "+home.Name+" region: "+strings.Join(home.Names(), ", "))
 	command.Args = cobra.NoArgs
 	command.RunE = func(c *cobra.Command, _ []string) error {
 		if name == "" {
