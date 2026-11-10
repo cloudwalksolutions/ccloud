@@ -59,3 +59,4 @@ homebrew_casks:
 release:
   draft: false
   prerelease: auto
+  target_commitish: "{{ .FullCommit }}"
