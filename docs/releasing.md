@@ -2,8 +2,8 @@
 
 Every merge to `main` is a release. `.github/workflows/release.yml` tags the next patch from the
 latest `v*` tag, runs GoReleaser (darwin/linux × amd64/arm64 archives, checksums, a GitHub
-Release, the `ccloud` cask in `cloudwalksolutions/homebrew-tap`), and pushes the tag only after the
-release succeeded, so a failed run leaves nothing behind and can be re-run.
+Release, the `ccloud` cask in `cloudwalksolutions/homebrew-tap`). A run that fails after GoReleaser
+published the GitHub Release deletes that release and its tag, so it can be re-run.
 
 Merges touching only Markdown, `docs/` or `specs/` do not release. Bump minor or major by pushing
 the tag yourself; the next merge patches from it.
