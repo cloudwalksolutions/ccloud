@@ -16,8 +16,15 @@ func paletteFor(out io.Writer) palette {
 	if os.Getenv("NO_COLOR") != "" {
 		return false
 	}
+	return palette(terminal(out))
+}
+
+func terminal(out io.Writer) bool {
+	if os.Getenv("CCLOUD_FORCE_TTY") != "" {
+		return true
+	}
 	file, ok := out.(*os.File)
-	return palette(ok && term.IsTerminal(int(file.Fd())))
+	return ok && term.IsTerminal(int(file.Fd()))
 }
 
 func (p palette) paint(code, text string) string {

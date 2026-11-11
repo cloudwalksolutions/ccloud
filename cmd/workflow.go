@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -26,14 +27,25 @@ func workflowCmd(home cloud.Cloud) *cobra.Command {
 		Use:     "view <run> --app <app> --region <region>",
 		Short:   "Show a run's steps, how long each took and why any failed",
 		Example: "  ccloud workflow view api-tests-x7k2p -a <app> -r " + home.Regions[0].Name,
-		Args: func(c *cobra.Command, args []string) error {
-			if len(args) != 1 {
-				return fmt.Errorf("which run? ccloud workflow view <run>, where <run> is an ID from ccloud workflow list")
-			}
-			return nil
-		},
+		Args:    oneRun,
 	}, workflowView))
+	watch := appCmd(home, &cobra.Command{
+		Use:     "watch <run> --app <app> --region <region>",
+		Short:   "Follow a run's steps until it finishes",
+		Example: "  ccloud workflow watch api-tests-x7k2p -a <app> -r " + home.Regions[0].Name,
+		Args:    oneRun,
+	}, workflowWatch)
+	watch.Flags().DurationP("interval", "i", 3*time.Second, "how often to look again")
+	watch.Flags().Bool("exit-status", false, "exit non-zero when the run does not succeed")
+	workflow.AddCommand(watch)
 	return workflow
+}
+
+func oneRun(c *cobra.Command, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("which run? %s <run>, where <run> is an ID from ccloud workflow list", c.CommandPath())
+	}
+	return nil
 }
 
 func appCmd(home cloud.Cloud, command *cobra.Command, run func(*cobra.Command, cloud.Region, string) error) *cobra.Command {

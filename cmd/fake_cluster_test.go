@@ -78,6 +78,7 @@ type fakeCluster struct {
 	server    *httptest.Server
 	byNS      map[string][]workflow
 	forbidden map[string]bool
+	versions  []workflow
 }
 
 func newFakeCluster() *fakeCluster {
@@ -89,6 +90,11 @@ func newFakeCluster() *fakeCluster {
 
 func (f *fakeCluster) workflows(namespace string, runs ...workflow) {
 	f.byNS[namespace] = append(f.byNS[namespace], runs...)
+}
+
+func (f *fakeCluster) progress(namespace string, versions ...workflow) {
+	f.versions = versions
+	f.workflows(namespace, versions[0])
 }
 
 func (f *fakeCluster) forbid(namespace string) {
@@ -138,8 +144,12 @@ func (f *fakeCluster) serve(w http.ResponseWriter, r *http.Request) {
 }
 
 func (f *fakeCluster) get(w http.ResponseWriter, namespace, name string) {
-	for _, run := range f.byNS[namespace] {
+	for i, run := range f.byNS[namespace] {
 		if run["metadata"].(map[string]any)["name"] == name {
+			if len(f.versions) > 1 {
+				f.versions = f.versions[1:]
+				f.byNS[namespace][i] = f.versions[0]
+			}
 			_ = json.NewEncoder(w).Encode(run)
 			return
 		}
