@@ -21,7 +21,11 @@ func (c command) watch(ctx context.Context, run workflows.Run) error {
 			render(out, run, time.Now())
 			fmt.Fprintf(out, "\nLooking again every %s; Ctrl-C stops watching, not the run.\n", interval)
 		}
-		time.Sleep(interval)
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(interval):
+		}
 		run, err = c.getRun(ctx)
 	}
 	if err != nil {

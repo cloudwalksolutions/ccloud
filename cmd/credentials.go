@@ -25,7 +25,7 @@ func (c command) credentials(ctx context.Context) error {
 	if err := c.tunnel(ctx, proxy.Host); err != nil {
 		return err
 	}
-	token := exec.Command("kubectl-oidc_login", c.oidcArgs()...)
+	token := exec.CommandContext(ctx, "kubectl-oidc_login", c.oidcArgs()...)
 	token.Stdin, token.Stdout, token.Stderr = c.InOrStdin(), c.OutOrStdout(), c.ErrOrStderr()
 	return token.Run()
 }

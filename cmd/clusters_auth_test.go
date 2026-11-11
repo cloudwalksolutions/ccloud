@@ -2,8 +2,10 @@ package cmd_test
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,6 +40,17 @@ var _ = Describe("ccloud clusters auth", func() {
 		tool("kubectl", "exit 0")
 		tool("kubectl-oidc_login", "exit 0")
 	})
+
+	It("stops waiting for your sign-in when you press Ctrl-C, leaving your kubeconfig alone", func(ctx SpecContext) {
+		tool("kubectl", `exec /bin/sleep 5`)
+		interrupted, interrupt := context.WithCancel(ctx)
+		time.AfterFunc(100*time.Millisecond, interrupt)
+
+		err := cmd.RunContext(interrupted, []string{"clusters", "auth", "--region", "north1"}, out, out, example, "dev")
+
+		Expect(err).To(MatchError(HavePrefix("signing in to north1 failed, so your kubeconfig is unchanged")))
+		Expect(kubeconfig).NotTo(BeAnExistingFile())
+	}, SpecTimeout(3*time.Second))
 
 	It("names your kubeconfig's directory when it cannot write there", func() {
 		Expect(os.MkdirAll(filepath.Dir(kubeconfig), 0o500)).To(Succeed())
