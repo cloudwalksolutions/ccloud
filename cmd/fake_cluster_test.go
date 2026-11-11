@@ -62,7 +62,7 @@ func (w workflow) step(id, name, phase string, started time.Time, took time.Dura
 		nodes = map[string]any{}
 		status["nodes"] = nodes
 	}
-	node := map[string]any{"id": id, "displayName": name, "type": "Pod", "phase": phase, "message": message}
+	node := map[string]any{"id": id, "displayName": name, "templateName": name, "type": "Pod", "phase": phase, "message": message}
 	if !started.IsZero() {
 		node["startedAt"] = started.UTC().Format(time.RFC3339)
 		if took > 0 {
@@ -79,10 +79,11 @@ type fakeCluster struct {
 	byNS      map[string][]workflow
 	forbidden map[string]bool
 	versions  []workflow
+	logs      map[string]string
 }
 
 func newFakeCluster() *fakeCluster {
-	f := &fakeCluster{byNS: map[string][]workflow{}, forbidden: map[string]bool{}}
+	f := &fakeCluster{byNS: map[string][]workflow{}, forbidden: map[string]bool{}, logs: map[string]string{}}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	DeferCleanup(f.server.Close)
 	return f
@@ -101,7 +102,30 @@ func (f *fakeCluster) forbid(namespace string) {
 	f.forbidden[namespace] = true
 }
 
+func (f *fakeCluster) podLog(namespace, pod, text string) {
+	f.logs[namespace+"/"+pod] = text
+}
+
+func (f *fakeCluster) serveLog(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/v1/namespaces/"), "/")
+	text, ok := f.logs[parts[0]+"/"+parts[2]]
+	if !ok || r.URL.Query().Get("container") != "main" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"apiVersion": "v1", "kind": "Status", "status": "Failure", "reason": "NotFound", "code": 404,
+			"message": `pods "` + parts[2] + `" not found`,
+		})
+		return
+	}
+	_, _ = w.Write([]byte(text))
+}
+
 func (f *fakeCluster) serve(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, "/api/v1/namespaces/") && strings.HasSuffix(r.URL.Path, "/log") {
+		f.serveLog(w, r)
+		return
+	}
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/apis/argoproj.io/v1alpha1/namespaces/"), "/")
 	if len(parts) < 2 || parts[1] != "workflows" {
 		http.NotFound(w, r)

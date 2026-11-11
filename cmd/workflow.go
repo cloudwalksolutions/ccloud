@@ -38,6 +38,16 @@ func workflowCmd(home cloud.Cloud) *cobra.Command {
 	watch.Flags().DurationP("interval", "i", 3*time.Second, "how often to look again")
 	watch.Flags().Bool("exit-status", false, "exit non-zero when the run does not succeed")
 	workflow.AddCommand(watch)
+	stepLogs := appCmd(home, &cobra.Command{
+		Use:     "logs <run> --app <app> --region <region>",
+		Short:   "Print each step's log, named for its step, long after its pods are gone",
+		Example: "  ccloud workflow logs api-tests-x7k2p -a <app> -r " + home.Regions[0].Name + " --failed",
+		Args:    oneRun,
+	}, func(c *cobra.Command, region cloud.Region, app string) error {
+		return workflowLogs(c, home, region, app)
+	})
+	stepLogs.Flags().Bool("failed", false, "only the steps that failed")
+	workflow.AddCommand(stepLogs)
 	return workflow
 }
 

@@ -24,6 +24,9 @@ func workflowView(c *cobra.Command, region cloud.Region, app string) error {
 		return err
 	}
 	render(c.OutOrStdout(), run, time.Now())
+	if failed(run.Status.Phase) {
+		fmt.Fprintf(c.OutOrStdout(), "\nTo see what failed, try: ccloud workflow logs %s -a %s -r %s --failed\n", run.Name(), app, region.Name)
+	}
 	return nil
 }
 

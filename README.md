@@ -29,12 +29,14 @@ the namespace kubectl uses there.
 ccloud workflow list -a <app> -r us-east1 --pr 105
 ccloud workflow view api-tests-x7k2p -a <app> -r us-east1
 ccloud workflow watch api-tests-x7k2p -a <app> -r us-east1 --exit-status
+ccloud workflow logs api-tests-x7k2p -a <app> -r us-east1 --failed
 ```
 
 Your app's CI runs, read through the cluster you signed in to with `clusters auth`. `list` shows
 each run's result, flow, pull request, branch and timing, newest first; `view` shows a run's steps
 in the order they ran, how long each took, and why one failed. `watch` redraws that view until the
-run ends, and with `--exit-status` exits non-zero unless it succeeded.
+run ends, and with `--exit-status` exits non-zero unless it succeeded. `logs` prints each step's
+log as `step<TAB>line`, from its pod while it exists and from the logs gateway once it is gone.
 
 ## Logs
 

@@ -39,13 +39,14 @@ type Run struct {
 }
 
 type Step struct {
-	ID          string    `json:"id"`
-	DisplayName string    `json:"displayName"`
-	Type        string    `json:"type"`
-	Phase       string    `json:"phase"`
-	Message     string    `json:"message"`
-	StartedAt   time.Time `json:"startedAt"`
-	FinishedAt  time.Time `json:"finishedAt"`
+	ID           string    `json:"id"`
+	TemplateName string    `json:"templateName"`
+	DisplayName  string    `json:"displayName"`
+	Type         string    `json:"type"`
+	Phase        string    `json:"phase"`
+	Message      string    `json:"message"`
+	StartedAt    time.Time `json:"startedAt"`
+	FinishedAt   time.Time `json:"finishedAt"`
 }
 
 func (s Step) Took() time.Duration {
@@ -53,6 +54,10 @@ func (s Step) Took() time.Duration {
 		return 0
 	}
 	return s.FinishedAt.Sub(s.StartedAt)
+}
+
+func (r Run) PodName(step Step) string {
+	return r.Name() + "-" + step.TemplateName + "-" + strings.TrimPrefix(step.ID, r.Name()+"-")
 }
 
 func (r Run) Steps() []Step {
