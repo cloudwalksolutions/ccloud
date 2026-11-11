@@ -3,6 +3,7 @@ package cmd_test
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -92,7 +93,7 @@ type fakeCluster struct {
 
 func newFakeCluster() *fakeCluster {
 	f := &fakeCluster{byNS: map[string][]workflow{}, forbidden: map[string]bool{}, logs: map[string]string{}, unwritable: map[string]bool{}}
-	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
+	f.server = httptest.NewTLSServer(http.HandlerFunc(f.serve))
 	DeferCleanup(f.server.Close)
 	return f
 }
@@ -244,7 +245,8 @@ func (f *fakeCluster) get(w http.ResponseWriter, namespace, name string) {
 func (f *fakeCluster) signIn(region string) {
 	cfg := api.NewConfig()
 	name := "ccloud-" + region
-	cfg.Clusters[name] = &api.Cluster{Server: f.server.URL}
+	authority := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.server.Certificate().Raw})
+	cfg.Clusters[name] = &api.Cluster{Server: f.server.URL, CertificateAuthorityData: authority}
 	cfg.AuthInfos[name] = &api.AuthInfo{Token: "dev-token"}
 	cfg.Contexts[name] = &api.Context{Cluster: name, AuthInfo: name}
 	cfg.CurrentContext = name

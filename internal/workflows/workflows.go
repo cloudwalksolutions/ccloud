@@ -4,38 +4,27 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"maps"
 	"math"
 	"slices"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 )
 
-var resource = schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
-
 type Run struct {
-	object   *unstructured.Unstructured
 	Metadata struct {
 		Name              string            `json:"name"`
+		GenerateName      string            `json:"generateName"`
 		CreationTimestamp time.Time         `json:"creationTimestamp"`
 		Labels            map[string]string `json:"labels"`
 	} `json:"metadata"`
-	Spec struct {
-		Arguments struct {
-			Parameters []struct {
-				Name  string `json:"name"`
-				Value string `json:"value"`
-			} `json:"parameters"`
-		} `json:"arguments"`
-	} `json:"spec"`
+	Spec   map[string]any `json:"spec"`
 	Status struct {
 		Phase      string          `json:"phase"`
 		StartedAt  time.Time       `json:"startedAt"`
@@ -90,9 +79,13 @@ func (r Run) PR() string   { return r.Metadata.Labels["pr"] }
 func (r Run) SHA() string  { return r.Metadata.Labels["sha"] }
 
 func (r Run) Branch() string {
-	for _, parameter := range r.Spec.Arguments.Parameters {
-		if parameter.Name == "revision" {
-			return parameter.Value
+	arguments, _ := r.Spec["arguments"].(map[string]any)
+	parameters, _ := arguments["parameters"].([]any)
+	for _, parameter := range parameters {
+		named, _ := parameter.(map[string]any)
+		if named["name"] == "revision" {
+			value, _ := named["value"].(string)
+			return value
 		}
 	}
 	return ""
@@ -108,88 +101,71 @@ func (r Run) Elapsed(now time.Time) time.Duration {
 	return r.Status.FinishedAt.Sub(r.Status.StartedAt)
 }
 
-func decode(item *unstructured.Unstructured) (Run, error) {
-	run := Run{object: item}
-	raw, err := json.Marshal(item.Object)
-	if err != nil { // coverage-ignore
-		return run, err
-	}
-	return run, json.Unmarshal(raw, &run)
-}
-
 type Runs struct {
-	workflows dynamic.ResourceInterface
-	pods      corev1client.PodInterface
+	core      *corev1client.CoreV1Client
+	namespace string
 }
 
 func In(cfg *rest.Config, namespace string) (Runs, error) {
-	workflows, err := dynamic.NewForConfig(cfg)
-	if err != nil { // coverage-ignore
-		return Runs{}, err
-	}
-	pods, err := corev1client.NewForConfig(cfg)
-	if err != nil { // coverage-ignore
-		return Runs{}, err
-	}
-	return Runs{workflows: workflows.Resource(resource).Namespace(namespace), pods: pods.Pods(namespace)}, nil
+	core, err := corev1client.NewForConfig(cfg)
+	return Runs{core: core, namespace: namespace}, err
+}
+
+func (r Runs) path(name ...string) string {
+	return strings.Join(append([]string{"/apis/argoproj.io/v1alpha1/namespaces", r.namespace, "workflows"}, name...), "/")
 }
 
 func (r Runs) Get(ctx context.Context, name string) (Run, error) {
-	item, err := r.workflows.Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return Run{}, err
+	var run Run
+	raw, err := r.core.RESTClient().Get().AbsPath(r.path(name)).DoRaw(ctx)
+	if err == nil {
+		err = json.Unmarshal(raw, &run)
 	}
-	return decode(item)
+	return run, err
+}
+
+func (r Runs) List(ctx context.Context, selector string) ([]Run, error) {
+	var list struct {
+		Items []Run `json:"items"`
+	}
+	raw, err := r.core.RESTClient().Get().AbsPath(r.path()).Param("labelSelector", selector).DoRaw(ctx)
+	if err == nil {
+		err = json.Unmarshal(raw, &list)
+	}
+	slices.SortFunc(list.Items, func(a, b Run) int {
+		return b.Metadata.CreationTimestamp.Compare(a.Metadata.CreationTimestamp)
+	})
+	return list.Items, err
 }
 
 func (r Runs) StepLog(ctx context.Context, run Run, step Step) (string, error) {
-	text, err := r.pods.GetLogs(run.PodName(step), &corev1.PodLogOptions{Container: "main"}).DoRaw(ctx)
+	text, err := r.core.Pods(r.namespace).GetLogs(run.PodName(step), &corev1.PodLogOptions{Container: "main"}).DoRaw(ctx)
 	return string(text), err
 }
 
 func (r Runs) Cancel(ctx context.Context, name string) error {
-	_, err := r.workflows.Patch(ctx, name, types.MergePatchType, []byte(`{"spec":{"shutdown":"Stop"}}`), metav1.PatchOptions{})
-	return err
+	return r.core.RESTClient().Patch(types.MergePatchType).AbsPath(r.path(name)).Body([]byte(`{"spec":{"shutdown":"Stop"}}`)).Do(ctx).Error()
 }
 
 func (r Runs) Rerun(ctx context.Context, run Run) (string, error) {
-	original := run.object
-	spec, _, _ := unstructured.NestedMap(original.Object, "spec")
+	spec := maps.Clone(run.Spec)
 	delete(spec, "shutdown")
 	labels := map[string]any{}
-	for key, value := range original.GetLabels() {
+	for key, value := range run.Metadata.Labels {
 		if !strings.HasPrefix(key, "workflows.argoproj.io/") {
 			labels[key] = value
 		}
 	}
 	rerun := &unstructured.Unstructured{Object: map[string]any{
-		"apiVersion": resource.GroupVersion().String(),
+		"apiVersion": "argoproj.io/v1alpha1",
 		"kind":       "Workflow",
-		"metadata":   map[string]any{"generateName": original.GetGenerateName(), "labels": labels},
+		"metadata":   map[string]any{"generateName": run.Metadata.GenerateName, "labels": labels},
 		"spec":       spec,
 	}}
-	created, err := r.workflows.Create(ctx, rerun, metav1.CreateOptions{})
-	if err != nil {
-		return "", err
+	var created Run
+	raw, err := r.core.RESTClient().Post().AbsPath(r.path()).Body(rerun).DoRaw(ctx)
+	if err == nil {
+		err = json.Unmarshal(raw, &created)
 	}
-	return created.GetName(), nil
-}
-
-func (r Runs) List(ctx context.Context, selector string) ([]Run, error) {
-	list, err := r.workflows.List(ctx, metav1.ListOptions{LabelSelector: selector})
-	if err != nil {
-		return nil, err
-	}
-	runs := make([]Run, 0, len(list.Items))
-	for i := range list.Items {
-		run, err := decode(&list.Items[i])
-		if err != nil { // coverage-ignore
-			return nil, err
-		}
-		runs = append(runs, run)
-	}
-	slices.SortFunc(runs, func(a, b Run) int {
-		return b.Metadata.CreationTimestamp.Compare(a.Metadata.CreationTimestamp)
-	})
-	return runs, nil
+	return created.Name(), err
 }

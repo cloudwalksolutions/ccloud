@@ -2,6 +2,7 @@ package cmd_test
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/cloudwalksolutions/ccloud/cmd"
 )
@@ -39,6 +41,18 @@ var _ = Describe("ccloud workflow list", func() {
 		err := run("workflow", "list", "-a", "shop", "-r", "north1")
 
 		Expect(err).To(MatchError(ContainSubstring("run ccloud clusters auth --region north1")))
+	})
+
+	It("sends you to sign in again when the region's context is damaged", func() {
+		ci.signIn("north1")
+		cfg, err := clientcmd.LoadFromFile(os.Getenv("KUBECONFIG"))
+		Expect(err).NotTo(HaveOccurred())
+		cfg.Clusters["ccloud-north1"].CertificateAuthorityData = []byte("not a certificate")
+		Expect(clientcmd.WriteToFile(*cfg, os.Getenv("KUBECONFIG"))).To(Succeed())
+
+		err = run("workflow", "list", "-a", "shop", "-r", "north1")
+
+		Expect(err).To(MatchError(HavePrefix("your ccloud-north1 context is damaged; sign in again with ccloud clusters auth --region north1: ")))
 	})
 
 	It("says so when the cluster does not let you read the app's runs", func() {

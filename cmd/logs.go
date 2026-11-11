@@ -119,6 +119,10 @@ func (r *logReader) read(query url.Values) ([]logs.Entry, error) {
 }
 
 func signInToLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region) (logs.Gateway, error) {
+	address, err := url.Parse(region.Logs)
+	if err != nil {
+		return logs.Gateway{}, fmt.Errorf("%s's logs gateway %q is not a URL: %w", region.Name, region.Logs, err)
+	}
 	access, err := accessToken(c, region)
 	if err != nil {
 		return logs.Gateway{}, err
@@ -130,7 +134,7 @@ func signInToLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region) (logs
 	if err != nil || json.Unmarshal(credential, &exchanged) != nil || exchanged.Status == nil {
 		return logs.Gateway{}, fmt.Errorf("signing in to %s failed", home.Issuer)
 	}
-	return logs.Gateway{URL: region.Logs, AccessToken: access, IDToken: exchanged.Status.Token}, nil
+	return logs.Gateway{URL: address, AccessToken: access, IDToken: exchanged.Status.Token}, nil
 }
 
 func accessToken(c *cobra.Command, region cloud.Region) (string, error) {

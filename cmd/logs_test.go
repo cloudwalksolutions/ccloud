@@ -174,6 +174,14 @@ esac`)
 		Expect(gateway.asked[0].Header.Get("cf-access-token")).To(Equal("access-jwt"))
 	})
 
+	It("names a logs address in the cloud's definition that is not a URL", func() {
+		home.Regions[0].Logs = "https://logs north1"
+
+		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
+
+		Expect(err).To(MatchError(HavePrefix(`north1's logs gateway "https://logs north1" is not a URL: `)))
+	})
+
 	It("says so when something other than the gateway answers, such as Access's login page", func() {
 		gateway.answers = []string{"<!DOCTYPE html><title>Sign in ・ Cloudflare Access</title>"}
 
