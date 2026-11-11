@@ -53,8 +53,12 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      - name: Generate coverage profile
+        run: go test -count=1 ./... -coverprofile=cover.out -covermode=atomic -coverpkg=./...
       - name: Coverage gate
-        run: make coverage
+        uses: vladopajic/go-test-coverage@v2.23.0
+        with:
+          config: ./.testcoverage.yml
 
   goreleaser:
     runs-on: ubuntu-latest
