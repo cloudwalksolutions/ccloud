@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
-	"io"
 	"math"
 	"slices"
 	"strings"
@@ -143,8 +142,9 @@ func (r Runs) Get(ctx context.Context, name string) (Run, error) {
 	return decode(item)
 }
 
-func (r Runs) StepLog(ctx context.Context, run Run, step Step) (io.ReadCloser, error) {
-	return r.pods.GetLogs(run.PodName(step), &corev1.PodLogOptions{Container: "main"}).Stream(ctx)
+func (r Runs) StepLog(ctx context.Context, run Run, step Step) (string, error) {
+	text, err := r.pods.GetLogs(run.PodName(step), &corev1.PodLogOptions{Container: "main"}).DoRaw(ctx)
+	return string(text), err
 }
 
 func (r Runs) Cancel(ctx context.Context, name string) error {

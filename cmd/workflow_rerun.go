@@ -6,13 +6,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
+	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
-func workflowRerun(c *cobra.Command, region cloud.Region, app string) error {
-	runs, run, err := openRun(c, region, app)
-	if err != nil {
-		return err
-	}
+func workflowRerun(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs, run workflows.Run) error {
 	started, err := runs.Rerun(c.Context(), run)
 	if err != nil {
 		return errMayNotChange(err, region, app)

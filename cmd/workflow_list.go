@@ -10,13 +10,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
+	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
-func workflowList(c *cobra.Command, region cloud.Region, app string) error {
-	ci, err := runsOf(region, app)
-	if err != nil {
-		return err
-	}
+func workflowList(c *cobra.Command, region cloud.Region, app string, ci workflows.Runs) error {
 	selector := labels.Set{}
 	for _, flag := range []string{"flow", "pr"} {
 		if value, _ := c.Flags().GetString(flag); value != "" {
@@ -27,7 +24,7 @@ func workflowList(c *cobra.Command, region cloud.Region, app string) error {
 	namespace := "ci-" + app
 	runs, err := ci.List(c.Context(), selector.String())
 	if apierrors.IsForbidden(err) {
-		return fmt.Errorf("you may not read %s's runs in %s (%s)", app, region.Name, namespace)
+		err = fmt.Errorf("you may not read %s's runs in %s (%s)", app, region.Name, namespace)
 	}
 	if err != nil {
 		return err

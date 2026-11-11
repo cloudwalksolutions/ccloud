@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -18,7 +17,7 @@ func workflowCmd(home cloud.Cloud) *cobra.Command {
 		Use:   "workflow",
 		Short: "Your app's CI runs: list them and see their steps",
 	}
-	list := appCmd(home, &cobra.Command{
+	list := ciCmd(home, &cobra.Command{
 		Use:     "list --app <app> --region <region>",
 		Short:   "List an app's recent CI runs, newest first",
 		Example: "  ccloud workflow list -a <app> -r " + home.Regions[0].Name + " --pr 105",
@@ -27,64 +26,66 @@ func workflowCmd(home cloud.Cloud) *cobra.Command {
 	list.Flags().String("pr", "", "only runs for this pull request number")
 	list.Flags().IntP("limit", "L", 20, "at most this many runs")
 	workflow.AddCommand(list)
-	workflow.AddCommand(appCmd(home, &cobra.Command{
+	workflow.AddCommand(runCmd(home, &cobra.Command{
 		Use:     "view <run> --app <app> --region <region>",
 		Short:   "Show a run's steps, how long each took and why any failed",
 		Example: "  ccloud workflow view api-tests-x7k2p -a <app> -r " + home.Regions[0].Name,
-		Args:    oneRun,
 	}, workflowView))
-	watch := appCmd(home, &cobra.Command{
+	watch := runCmd(home, &cobra.Command{
 		Use:     "watch <run> --app <app> --region <region>",
 		Short:   "Follow a run's steps until it finishes",
 		Example: "  ccloud workflow watch api-tests-x7k2p -a <app> -r " + home.Regions[0].Name,
-		Args:    oneRun,
 	}, workflowWatch)
 	watch.Flags().DurationP("interval", "i", 3*time.Second, "how often to look again")
 	watch.Flags().Bool("exit-status", false, "exit non-zero when the run does not succeed")
 	workflow.AddCommand(watch)
-	stepLogs := appCmd(home, &cobra.Command{
+	stepLogs := runCmd(home, &cobra.Command{
 		Use:     "logs <run> --app <app> --region <region>",
 		Short:   "Print each step's log, named for its step, long after its pods are gone",
 		Example: "  ccloud workflow logs api-tests-x7k2p -a <app> -r " + home.Regions[0].Name + " --failed",
-		Args:    oneRun,
-	}, func(c *cobra.Command, region cloud.Region, app string) error {
-		return workflowLogs(c, home, region, app)
+	}, func(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs, run workflows.Run) error {
+		return workflowLogs(c, home, region, app, runs, run)
 	})
 	stepLogs.Flags().Bool("failed", false, "only the steps that failed")
 	workflow.AddCommand(stepLogs)
-	workflow.AddCommand(appCmd(home, &cobra.Command{
+	workflow.AddCommand(runCmd(home, &cobra.Command{
 		Use:     "cancel <run> --app <app> --region <region>",
 		Short:   "Stop a run still going; its exit handlers still report",
 		Example: "  ccloud workflow cancel api-tests-x7k2p -a <app> -r " + home.Regions[0].Name,
-		Args:    oneRun,
 	}, workflowCancel))
-	workflow.AddCommand(appCmd(home, &cobra.Command{
+	workflow.AddCommand(runCmd(home, &cobra.Command{
 		Use:     "rerun <run> --app <app> --region <region>",
 		Short:   "Start the run again from the beginning, for the same pull request and commit",
 		Example: "  ccloud workflow rerun api-tests-x7k2p -a <app> -r " + home.Regions[0].Name,
-		Args:    oneRun,
 	}, workflowRerun))
 	return workflow
 }
 
-func runsOf(region cloud.Region, app string) (workflows.Runs, error) {
-	cfg, err := kubeconfig.REST(kubeconfig.Path(), region.Context())
-	if errors.Is(err, kubeconfig.ErrNoContext) {
-		return workflows.Runs{}, errNoSignInFor(region)
-	}
-	if err != nil {
-		return workflows.Runs{}, err
-	}
-	return workflows.In(cfg, "ci-"+app)
+func ciCmd(home cloud.Cloud, command *cobra.Command, action func(*cobra.Command, cloud.Region, string, workflows.Runs) error) *cobra.Command {
+	return appCmd(home, command, func(c *cobra.Command, region cloud.Region, app string) error {
+		cfg, err := kubeconfig.REST(kubeconfig.Path(), region.Context())
+		if err != nil {
+			return signInError(err, region)
+		}
+		runs, err := workflows.In(cfg, "ci-"+app)
+		if err != nil {
+			return err
+		}
+		return action(c, region, app, runs)
+	})
 }
 
-func openRun(c *cobra.Command, region cloud.Region, app string) (workflows.Runs, workflows.Run, error) {
-	runs, err := runsOf(region, app)
-	if err != nil {
-		return runs, workflows.Run{}, err
-	}
-	run, err := getRun(c, runs, region, app)
-	return runs, run, err
+type runAction func(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs, run workflows.Run) error
+
+func runCmd(home cloud.Cloud, command *cobra.Command, action runAction) *cobra.Command {
+	command.Args = oneRun
+	return ciCmd(home, command, func(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs) error {
+		run, err := getRun(c, runs, region, app)
+		if err != nil {
+			return err
+		}
+		return action(c, region, app, runs, run)
+	})
 }
 
 func getRun(c *cobra.Command, runs workflows.Runs, region cloud.Region, app string) (workflows.Run, error) {
