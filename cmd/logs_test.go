@@ -157,18 +157,20 @@ var _ = Describe("ccloud logs", func() {
 		Expect(err).To(MatchError("you may not read shop's prod logs in north1: dev@example.test may not read logs in prod-shop"))
 	})
 
-	It("signs you in to Access first when you have no session for the region yet", func() {
+	It("signs you in to Access first when you have no session for the region yet, never printing the token", func() {
 		bin := GinkgoT().TempDir()
 		GinkgoT().Setenv("PATH", bin)
 		tool(bin, "kubectl-oidc_login", `echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
 		session := filepath.Join(bin, "session")
 		tool(bin, "cloudflared", `case "$1 $2" in
-  "access login") echo "$3" > `+session+` ;;
+  "access login") for url; do :; done; echo "$url" > `+session+`
+    case " $* " in *" --quiet "*) ;; *) printf 'Successfully fetched your token:\n\naccess-jwt\n' ;; esac ;;
   "access token") [ -f `+session+` ] && echo access-jwt || { echo "Unable to find token" >&2; exit 1; } ;;
 esac`)
 
 		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1")).To(Succeed())
 
+		Expect(out.String()).NotTo(ContainSubstring("access-jwt"))
 		Expect(os.ReadFile(session)).To(Equal([]byte(home.Regions[0].Logs + "\n")))
 		Expect(gateway.asked).To(HaveLen(1))
 		Expect(gateway.asked[0].Header.Get("cf-access-token")).To(Equal("access-jwt"))
