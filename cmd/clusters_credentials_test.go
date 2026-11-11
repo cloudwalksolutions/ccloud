@@ -2,9 +2,11 @@ package cmd_test
 
 import (
 	"bytes"
+	"context"
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -78,6 +80,16 @@ var _ = Describe("ccloud clusters credentials", func() {
 
 		Expect(out.String()).To(ContainSubstring(`"token":"id-token"`))
 	})
+
+	It("gives up on a cloudflared that never opens the tunnel, when kubectl stops waiting", func(ctx SpecContext) {
+		tool("cloudflared", `exec /bin/sleep 2`)
+		impatient, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+		defer cancel()
+
+		err := cmd.RunContext(impatient, []string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")
+
+		Expect(err).To(MatchError("cloudflared did not open " + address + " for k8s.north1.example.test in time"))
+	}, SpecTimeout(5*time.Second))
 
 	It("names cloudflared when it is not installed", func() {
 		err := cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")

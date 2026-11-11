@@ -17,7 +17,7 @@ func Path() string {
 	return clientcmd.NewDefaultClientConfigLoadingRules().GetDefaultFilename()
 }
 
-func Entry(home cloud.Cloud, region cloud.Region, self string) *api.Config {
+func Entry(home cloud.Cloud, region cloud.Region) *api.Config {
 	cfg := api.NewConfig()
 	name := region.Context()
 	cfg.Clusters[name] = &api.Cluster{
@@ -27,7 +27,7 @@ func Entry(home cloud.Cloud, region cloud.Region, self string) *api.Config {
 	}
 	cfg.AuthInfos[name] = &api.AuthInfo{Exec: &api.ExecConfig{
 		APIVersion:         "client.authentication.k8s.io/v1",
-		Command:            self,
+		Command:            "ccloud",
 		Args:               []string{"clusters", "credentials", "--region", region.Name},
 		InteractiveMode:    api.IfAvailableExecInteractiveMode,
 		ProvideClusterInfo: true,

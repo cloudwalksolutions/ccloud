@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,7 +23,7 @@ func credentials(c *cobra.Command, home cloud.Cloud, region cloud.Region) error 
 	if err != nil {
 		return err
 	}
-	if err := tunnel(region, address); err != nil {
+	if err := tunnel(c.Context(), region, address); err != nil {
 		return err
 	}
 	token := exec.Command("kubectl-oidc_login", oidcArgs(home)...)
@@ -51,7 +52,7 @@ func proxyAddress() (string, error) {
 	return proxy.Host, nil
 }
 
-func tunnel(region cloud.Region, address string) error {
+func tunnel(ctx context.Context, region cloud.Region, address string) error {
 	if listening(address) {
 		return nil
 	}
@@ -63,13 +64,14 @@ func tunnel(region cloud.Region, address string) error {
 	exited := make(chan error, 1)
 	go func() { exited <- cloudflared.Wait() }()
 
-	deadline := time.After(20 * time.Second)
+	ctx, stop := context.WithTimeout(ctx, 20*time.Second)
+	defer stop()
 	for {
 		select {
 		case err := <-exited:
 			return fmt.Errorf("cloudflared exited before %s was reachable at %s: %v", region.Host, address, err)
-		case <-deadline:
-			return fmt.Errorf("cloudflared did not open %s within 20s for %s", address, region.Host) // coverage-ignore
+		case <-ctx.Done():
+			return fmt.Errorf("cloudflared did not open %s for %s in time", address, region.Host)
 		case <-time.After(100 * time.Millisecond):
 			if listening(address) {
 				return nil

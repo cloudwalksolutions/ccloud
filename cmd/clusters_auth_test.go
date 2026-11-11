@@ -39,6 +39,15 @@ var _ = Describe("ccloud clusters auth", func() {
 		tool("kubectl-oidc_login", "exit 0")
 	})
 
+	It("names your kubeconfig's directory when it cannot write there", func() {
+		Expect(os.MkdirAll(filepath.Dir(kubeconfig), 0o500)).To(Succeed())
+
+		err := run("clusters", "auth", "--region", "north1")
+
+		Expect(err).To(MatchError(ContainSubstring(filepath.Dir(kubeconfig))))
+		Expect(kubeconfig).NotTo(BeAnExistingFile())
+	})
+
 	It("leaves a kubeconfig it cannot read as it was, naming it", func() {
 		existing := []byte("contexts: [this is not a kubeconfig")
 		Expect(os.MkdirAll(filepath.Dir(kubeconfig), 0o700)).To(Succeed())
@@ -84,6 +93,7 @@ var _ = Describe("ccloud clusters auth", func() {
 		_, err = clientcmd.NewNonInteractiveClientConfig(*cfg, "ccloud-north1", &clientcmd.ConfigOverrides{}, nil).ClientConfig()
 		Expect(err).NotTo(HaveOccurred(), "kubectl must accept the context as written")
 		exec := cfg.AuthInfos[cfg.Contexts["ccloud-north1"].AuthInfo].Exec
+		Expect(exec.Command).To(Equal("ccloud"), "by name, so an upgrade that moves the binary keeps the context working")
 		Expect(exec.Args).To(Equal([]string{"clusters", "credentials", "--region", "north1"}))
 		Expect(exec.ProvideClusterInfo).To(BeTrue(), "credentials finds its tunnel through the proxy-url kubectl passes it")
 		Expect(out.String()).To(ContainSubstring("dev@example.test"))

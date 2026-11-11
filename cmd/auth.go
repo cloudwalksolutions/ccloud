@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -16,19 +15,10 @@ import (
 )
 
 func auth(c *cobra.Command, home cloud.Cloud, region cloud.Region) error {
-	self, err := os.Executable()
-	if err != nil { // coverage-ignore
-		return err
-	}
-	scratch, err := os.MkdirTemp("", "ccloud-auth-")
-	if err != nil { // coverage-ignore
-		return err
-	}
-	defer func() { _ = os.RemoveAll(scratch) }()
-
-	entry := kubeconfig.Entry(home, region, self)
-	trial := filepath.Join(scratch, "kubeconfig")
-	if err := clientcmd.WriteToFile(*entry, trial); err != nil { // coverage-ignore
+	entry := kubeconfig.Entry(home, region)
+	trial := kubeconfig.Path() + "." + region.Context()
+	defer func() { _ = os.Remove(trial) }()
+	if err := clientcmd.WriteToFile(*entry, trial); err != nil {
 		return err
 	}
 
