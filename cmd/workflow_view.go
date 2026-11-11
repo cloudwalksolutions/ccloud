@@ -7,19 +7,13 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/rest"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
 func workflowView(c *cobra.Command, region cloud.Region, app string) error {
-	cfg, err := signedInTo(region)
-	if err != nil {
-		return err
-	}
-	run, err := getRun(c, cfg, region, app)
+	_, run, err := openRun(c, region, app)
 	if err != nil {
 		return err
 	}
@@ -28,15 +22,6 @@ func workflowView(c *cobra.Command, region cloud.Region, app string) error {
 		fmt.Fprintf(c.OutOrStdout(), "\nTo see what failed, try: ccloud workflow logs %s -a %s -r %s --failed\n", run.Name(), app, region.Name)
 	}
 	return nil
-}
-
-func getRun(c *cobra.Command, cfg *rest.Config, region cloud.Region, app string) (workflows.Run, error) {
-	name := c.Flags().Arg(0)
-	run, err := workflows.Get(c.Context(), cfg, "ci-"+app, name)
-	if apierrors.IsNotFound(err) {
-		return run, fmt.Errorf("%s has no run %s in %s; see ccloud workflow list -a %s -r %s", app, name, region.Name, app, region.Name)
-	}
-	return run, err
 }
 
 func render(out io.Writer, run workflows.Run, now time.Time) {

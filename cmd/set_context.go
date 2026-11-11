@@ -11,11 +11,8 @@ import (
 )
 
 func setContext(c *cobra.Command, region cloud.Region) error {
-	namespace, err := c.Flags().GetString("namespace")
-	if err != nil {
-		return err
-	}
-	err = kubeconfig.Use(kubeconfig.Path(), region.Context(), namespace)
+	namespace, _ := c.Flags().GetString("namespace")
+	err := kubeconfig.Use(kubeconfig.Path(), region.Context(), namespace)
 	if errors.Is(err, kubeconfig.ErrNoContext) {
 		return errNoSignInFor(region)
 	}

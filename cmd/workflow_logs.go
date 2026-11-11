@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 	"github.com/cloudwalksolutions/ccloud/internal/logs"
@@ -18,15 +16,7 @@ import (
 )
 
 func workflowLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app string) error {
-	cfg, err := signedInTo(region)
-	if err != nil {
-		return err
-	}
-	run, err := getRun(c, cfg, region, app)
-	if err != nil {
-		return err
-	}
-	pods, err := corev1client.NewForConfig(cfg)
+	runs, run, err := openRun(c, region, app)
 	if err != nil {
 		return err
 	}
@@ -38,7 +28,7 @@ func workflowLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app s
 		if step.StartedAt.IsZero() || (onlyFailed && !failed(step.Phase)) {
 			continue
 		}
-		stream, err := pods.Pods(namespace).GetLogs(run.PodName(step), &corev1.PodLogOptions{Container: "main"}).Stream(c.Context())
+		stream, err := runs.StepLog(c.Context(), run, step)
 		if apierrors.IsNotFound(err) {
 			if gateway == nil {
 				signedIn, err := signInToLogs(c, home, region)

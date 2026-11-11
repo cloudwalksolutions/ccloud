@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"text/tabwriter"
 	"time"
@@ -9,23 +8,12 @@ import (
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/rest"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
-	"github.com/cloudwalksolutions/ccloud/internal/kubeconfig"
-	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
-func signedInTo(region cloud.Region) (*rest.Config, error) {
-	cfg, err := kubeconfig.REST(kubeconfig.Path(), region.Context())
-	if errors.Is(err, kubeconfig.ErrNoContext) {
-		return nil, errNoSignInFor(region)
-	}
-	return cfg, err
-}
-
 func workflowList(c *cobra.Command, region cloud.Region, app string) error {
-	cfg, err := signedInTo(region)
+	ci, err := runsOf(region, app)
 	if err != nil {
 		return err
 	}
@@ -37,7 +25,7 @@ func workflowList(c *cobra.Command, region cloud.Region, app string) error {
 	}
 	limit, _ := c.Flags().GetInt("limit")
 	namespace := "ci-" + app
-	runs, err := workflows.List(c.Context(), cfg, namespace, selector.String())
+	runs, err := ci.List(c.Context(), selector.String())
 	if apierrors.IsForbidden(err) {
 		return fmt.Errorf("you may not read %s's runs in %s (%s)", app, region.Name, namespace)
 	}

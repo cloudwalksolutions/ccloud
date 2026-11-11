@@ -69,9 +69,7 @@ func readLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 			return err
 		}
 		for _, entry := range entries {
-			if err := printer.print(entry); err != nil {
-				return err
-			}
+			printer.print(entry)
 		}
 		if !follow {
 			return nil
@@ -82,7 +80,6 @@ func readLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 		query.Set("direction", "forward")
 		select {
 		case <-ctx.Done():
-			return nil
 		case <-time.After(interval):
 		}
 	}

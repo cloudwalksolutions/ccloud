@@ -1,23 +1,29 @@
 package workflows
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
+	"io"
+	"math"
 	"slices"
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 )
 
 var resource = schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
 
 type Run struct {
+	object   *unstructured.Unstructured
 	Metadata struct {
 		Name              string            `json:"name"`
 		CreationTimestamp time.Time         `json:"creationTimestamp"`
@@ -57,6 +63,13 @@ func (s Step) Took() time.Duration {
 	return s.FinishedAt.Sub(s.StartedAt)
 }
 
+func (s Step) startOrder() int64 {
+	if s.StartedAt.IsZero() {
+		return math.MaxInt64
+	}
+	return s.StartedAt.UnixNano()
+}
+
 func (r Run) PodName(step Step) string {
 	return r.Name() + "-" + step.TemplateName + "-" + strings.TrimPrefix(step.ID, r.Name()+"-")
 }
@@ -68,17 +81,7 @@ func (r Run) Steps() []Step {
 			steps = append(steps, node)
 		}
 	}
-	slices.SortFunc(steps, func(a, b Step) int {
-		switch {
-		case a.StartedAt.IsZero() != b.StartedAt.IsZero():
-			if a.StartedAt.IsZero() {
-				return 1
-			}
-			return -1
-		default:
-			return a.StartedAt.Compare(b.StartedAt)
-		}
-	})
+	slices.SortFunc(steps, func(a, b Step) int { return cmp.Compare(a.startOrder(), b.startOrder()) })
 	return steps
 }
 
@@ -107,7 +110,7 @@ func (r Run) Elapsed(now time.Time) time.Duration {
 }
 
 func decode(item *unstructured.Unstructured) (Run, error) {
-	var run Run
+	run := Run{object: item}
 	raw, err := json.Marshal(item.Object)
 	if err != nil {
 		return run, err
@@ -115,37 +118,42 @@ func decode(item *unstructured.Unstructured) (Run, error) {
 	return run, json.Unmarshal(raw, &run)
 }
 
-func Get(ctx context.Context, cfg *rest.Config, namespace, name string) (Run, error) {
-	client, err := dynamic.NewForConfig(cfg)
+type Runs struct {
+	workflows dynamic.ResourceInterface
+	pods      corev1client.PodInterface
+}
+
+func In(cfg *rest.Config, namespace string) (Runs, error) {
+	workflows, err := dynamic.NewForConfig(cfg)
 	if err != nil {
-		return Run{}, err
+		return Runs{}, err
 	}
-	item, err := client.Resource(resource).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	pods, err := corev1client.NewForConfig(cfg)
+	if err != nil {
+		return Runs{}, err
+	}
+	return Runs{workflows: workflows.Resource(resource).Namespace(namespace), pods: pods.Pods(namespace)}, nil
+}
+
+func (r Runs) Get(ctx context.Context, name string) (Run, error) {
+	item, err := r.workflows.Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return Run{}, err
 	}
 	return decode(item)
 }
 
-func Cancel(ctx context.Context, cfg *rest.Config, namespace, name string) error {
-	client, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		return err
-	}
-	_, err = client.Resource(resource).Namespace(namespace).Patch(ctx, name, types.MergePatchType, []byte(`{"spec":{"shutdown":"Stop"}}`), metav1.PatchOptions{})
+func (r Runs) StepLog(ctx context.Context, run Run, step Step) (io.ReadCloser, error) {
+	return r.pods.GetLogs(run.PodName(step), &corev1.PodLogOptions{Container: "main"}).Stream(ctx)
+}
+
+func (r Runs) Cancel(ctx context.Context, name string) error {
+	_, err := r.workflows.Patch(ctx, name, types.MergePatchType, []byte(`{"spec":{"shutdown":"Stop"}}`), metav1.PatchOptions{})
 	return err
 }
 
-func Rerun(ctx context.Context, cfg *rest.Config, namespace, name string) (string, error) {
-	client, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		return "", err
-	}
-	runs := client.Resource(resource).Namespace(namespace)
-	original, err := runs.Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
+func (r Runs) Rerun(ctx context.Context, run Run) (string, error) {
+	original := run.object
 	spec, _, _ := unstructured.NestedMap(original.Object, "spec")
 	delete(spec, "shutdown")
 	labels := map[string]any{}
@@ -160,19 +168,15 @@ func Rerun(ctx context.Context, cfg *rest.Config, namespace, name string) (strin
 		"metadata":   map[string]any{"generateName": original.GetGenerateName(), "labels": labels},
 		"spec":       spec,
 	}}
-	created, err := runs.Create(ctx, rerun, metav1.CreateOptions{})
+	created, err := r.workflows.Create(ctx, rerun, metav1.CreateOptions{})
 	if err != nil {
 		return "", err
 	}
 	return created.GetName(), nil
 }
 
-func List(ctx context.Context, cfg *rest.Config, namespace, selector string) ([]Run, error) {
-	client, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		return nil, err
-	}
-	list, err := client.Resource(resource).Namespace(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
+func (r Runs) List(ctx context.Context, selector string) ([]Run, error) {
+	list, err := r.workflows.List(ctx, metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}

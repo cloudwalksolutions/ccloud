@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
+	"github.com/cloudwalksolutions/ccloud/internal/kubeconfig"
+	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
 func workflowCmd(home cloud.Cloud) *cobra.Command {
@@ -61,6 +65,35 @@ func workflowCmd(home cloud.Cloud) *cobra.Command {
 		Args:    oneRun,
 	}, workflowRerun))
 	return workflow
+}
+
+func runsOf(region cloud.Region, app string) (workflows.Runs, error) {
+	cfg, err := kubeconfig.REST(kubeconfig.Path(), region.Context())
+	if errors.Is(err, kubeconfig.ErrNoContext) {
+		return workflows.Runs{}, errNoSignInFor(region)
+	}
+	if err != nil {
+		return workflows.Runs{}, err
+	}
+	return workflows.In(cfg, "ci-"+app)
+}
+
+func openRun(c *cobra.Command, region cloud.Region, app string) (workflows.Runs, workflows.Run, error) {
+	runs, err := runsOf(region, app)
+	if err != nil {
+		return runs, workflows.Run{}, err
+	}
+	run, err := getRun(c, runs, region, app)
+	return runs, run, err
+}
+
+func getRun(c *cobra.Command, runs workflows.Runs, region cloud.Region, app string) (workflows.Run, error) {
+	name := c.Flags().Arg(0)
+	run, err := runs.Get(c.Context(), name)
+	if apierrors.IsNotFound(err) {
+		return run, fmt.Errorf("%s has no run %s in %s; see ccloud workflow list -a %s -r %s", app, name, region.Name, app, region.Name)
+	}
+	return run, err
 }
 
 func oneRun(c *cobra.Command, args []string) error {
