@@ -55,6 +55,14 @@ var _ = Describe("ccloud clusters credentials", func() {
 		Expect(string(recorded)).To(ContainSubstring("get-token --oidc-issuer-url=https://issuer.example.test --oidc-client-id=client.example.test --oidc-client-secret=public-desktop-secret --oidc-extra-scope=email"))
 	})
 
+	It("sends you to sign in when run by hand rather than by kubectl for a ccloud context", func() {
+		GinkgoT().Setenv("KUBERNETES_EXEC_INFO", "")
+
+		err := cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")
+
+		Expect(err).To(MatchError("kubectl runs this for a ccloud context; sign in with ccloud clusters auth"))
+	})
+
 	It("opens the region's tunnel at the kubeconfig's proxy when none is listening, and says so when cloudflared cannot", func() {
 		tool("cloudflared", `echo "cloudflared $*" >> `+calls+`; exit 1`)
 

@@ -39,6 +39,15 @@ var _ = Describe("ccloud clusters set-context", func() {
 		Expect(os.ReadFile(kubeconfig)).To(Equal(existing))
 	})
 
+	It("names your kubeconfig when it cannot read it, and leaves it alone", func() {
+		existing := write("contexts: [this is not a kubeconfig")
+
+		err := cmd.Run([]string{"clusters", "set-context", "--region", "north1"}, out, out, example, "dev")
+
+		Expect(err).To(MatchError(ContainSubstring("reading " + kubeconfig)))
+		Expect(os.ReadFile(kubeconfig)).To(Equal(existing))
+	})
+
 	It("switches you to a region you signed in to, keeping the namespace you last chose there", func() {
 		write("apiVersion: v1\nkind: Config\ncurrent-context: work\ncontexts:\n- name: work\n  context: {cluster: work, user: work}\n- name: ccloud-north1\n  context: {cluster: ccloud-north1, user: ccloud-north1, namespace: stage-shop}\n")
 

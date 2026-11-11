@@ -30,7 +30,9 @@ type Refused struct {
 	Reason string
 }
 
-func (r Refused) Error() string { return r.Reason }
+func (r Refused) Error() string {
+	return fmt.Sprintf("the logs gateway answered %d %s: %s", r.Status, http.StatusText(r.Status), r.Reason)
+}
 
 func (g Gateway) Read(ctx context.Context, query url.Values) ([]Entry, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.URL+"/v1/logs?"+query.Encode(), nil)

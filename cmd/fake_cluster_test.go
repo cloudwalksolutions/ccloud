@@ -42,6 +42,11 @@ func (w workflow) pr(number, sha, branch string) workflow {
 	return w.label("pr", number).label("sha", sha)
 }
 
+func (w workflow) queued() workflow {
+	delete(w["status"].(map[string]any), "startedAt")
+	return w
+}
+
 func (w workflow) running() workflow {
 	w["status"].(map[string]any)["phase"] = "Running"
 	return w

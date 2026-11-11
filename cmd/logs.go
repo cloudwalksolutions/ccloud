@@ -108,13 +108,12 @@ func signInToLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region) (logs
 	if err != nil {
 		return logs.Gateway{}, err
 	}
-	credential, err := exec.Command("kubectl-oidc_login", oidcArgs(home)...).Output()
-	if err != nil {
-		return logs.Gateway{}, err
-	}
+	oidc := exec.Command("kubectl-oidc_login", oidcArgs(home)...)
+	oidc.Stderr = c.ErrOrStderr()
+	credential, err := oidc.Output()
 	var exchanged clientauthentication.ExecCredential
-	if err := json.Unmarshal(credential, &exchanged); err != nil || exchanged.Status == nil {
-		return logs.Gateway{}, fmt.Errorf("kubelogin gave no token: %s", credential)
+	if err != nil || json.Unmarshal(credential, &exchanged) != nil || exchanged.Status == nil {
+		return logs.Gateway{}, fmt.Errorf("signing in to %s failed", home.Issuer)
 	}
 	return logs.Gateway{URL: region.Logs, AccessToken: access, IDToken: exchanged.Status.Token}, nil
 }

@@ -61,9 +61,11 @@ var _ = Describe("ccloud workflow list", func() {
 	It("lists the app's runs newest first, with their result, pull request, branch and timing", func() {
 		now := time.Now().Truncate(time.Second)
 		ci.workflows("ci-shop",
+			ciRun("nightly-a1b2c", now.Add(-50*time.Hour)).flow("nightly").finished("Succeeded", time.Minute),
 			ciRun("release-m4k2p", now.Add(-3*time.Hour)).flow("release").finished("Succeeded", 4*time.Minute+12*time.Second),
 			ciRun("api-tests-x7k2p", now.Add(-time.Hour)).flow("api-tests").pr("105", "3f9a2c4e1d", "feat/BOAT-105/search").finished("Failed", 2*time.Minute+3*time.Second),
 			ciRun("build-images-q9w1z", now.Add(-5*time.Minute)).flow("build-images").pr("105", "3f9a2c4e1d", "feat/BOAT-105/search").running(),
+			ciRun("deploy-k8m3n", now.Add(-10*time.Second)).flow("deploy").queued(),
 		)
 		ci.signIn("north1")
 
@@ -71,9 +73,11 @@ var _ = Describe("ccloud workflow list", func() {
 
 		Expect(lines(out)).To(HaveExactElements(
 			MatchRegexp(`^STATUS\s+FLOW\s+PR\s+BRANCH\s+SHA\s+ID\s+ELAPSED\s+AGE$`),
+			MatchRegexp(`^\*\s+deploy\s+deploy-k8m3n\s+0s\s+just now$`),
 			MatchRegexp(`^\*\s+build-images\s+#105\s+feat/BOAT-105/search\s+3f9a2c4\s+build-images-q9w1z\s+5m\ds\s+5m ago$`),
 			MatchRegexp(`^X\s+api-tests\s+#105\s+feat/BOAT-105/search\s+3f9a2c4\s+api-tests-x7k2p\s+2m3s\s+1h ago$`),
 			MatchRegexp(`^✓\s+release\s+release-m4k2p\s+4m12s\s+3h ago$`),
+			MatchRegexp(`^✓\s+nightly\s+nightly-a1b2c\s+1m0s\s+2d ago$`),
 		))
 	})
 

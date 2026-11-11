@@ -174,6 +174,39 @@ esac`)
 		Expect(gateway.asked[0].Header.Get("cf-access-token")).To(Equal("access-jwt"))
 	})
 
+	It("says so when Cloudflare Access would not sign you in, and asks the gateway nothing", func() {
+		bin := GinkgoT().TempDir()
+		GinkgoT().Setenv("PATH", bin)
+		tool(bin, "cloudflared", `echo "Unable to reach the login page" >&2; exit 1`)
+
+		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
+
+		Expect(err).To(MatchError(HavePrefix("signing in to " + home.Regions[0].Logs + " through Cloudflare Access")))
+		Expect(out.String()).To(ContainSubstring("Unable to reach the login page"))
+		Expect(gateway.asked).To(BeEmpty())
+	})
+
+	It("names the gateway and what it answered when it cannot serve logs", func() {
+		gateway.refuse = http.StatusBadGateway
+
+		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
+
+		Expect(err).To(MatchError("the logs gateway answered 502 Bad Gateway: dev@example.test may not read logs in prod-shop"))
+	})
+
+	It("shows why the cloud's issuer would not sign you in, and asks the gateway nothing", func() {
+		bin := GinkgoT().TempDir()
+		GinkgoT().Setenv("PATH", bin)
+		tool(bin, "cloudflared", `echo access-jwt`)
+		tool(bin, "kubectl-oidc_login", `echo "oauth2: invalid_grant" >&2; exit 1`)
+
+		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
+
+		Expect(err).To(MatchError("signing in to " + home.Issuer + " failed"))
+		Expect(out.String()).To(ContainSubstring("oauth2: invalid_grant"))
+		Expect(gateway.asked).To(BeEmpty())
+	})
+
 	It("reads the environment's last hour as you, through Access, oldest line first", func() {
 		at := time.Date(2026, 10, 26, 7, 33, 21, 0, time.UTC)
 		gateway.answers = []string{`{"entries":[
