@@ -142,7 +142,7 @@ func accessToken(c *cobra.Command, region cloud.Region) (string, error) {
 	if err == nil {
 		return strings.TrimSpace(string(token)), nil
 	}
-	login := exec.CommandContext(c.Context(), "cloudflared", "access", "login", region.Logs)
+	login := exec.CommandContext(c.Context(), "cloudflared", "access", "login", "--quiet", region.Logs)
 	login.Stdout, login.Stderr = c.ErrOrStderr(), c.ErrOrStderr()
 	if err := login.Run(); err != nil {
 		return "", fmt.Errorf("signing in to %s through Cloudflare Access: %w", region.Logs, err)
