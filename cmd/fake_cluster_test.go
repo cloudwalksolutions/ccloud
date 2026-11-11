@@ -75,15 +75,17 @@ func (w workflow) step(id, name, phase string, started time.Time, took time.Dura
 }
 
 type fakeCluster struct {
-	server    *httptest.Server
-	byNS      map[string][]workflow
-	forbidden map[string]bool
-	versions  []workflow
-	logs      map[string]string
+	server     *httptest.Server
+	byNS       map[string][]workflow
+	forbidden  map[string]bool
+	versions   []workflow
+	logs       map[string]string
+	unwritable map[string]bool
+	writes     []written
 }
 
 func newFakeCluster() *fakeCluster {
-	f := &fakeCluster{byNS: map[string][]workflow{}, forbidden: map[string]bool{}, logs: map[string]string{}}
+	f := &fakeCluster{byNS: map[string][]workflow{}, forbidden: map[string]bool{}, logs: map[string]string{}, unwritable: map[string]bool{}}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	DeferCleanup(f.server.Close)
 	return f
@@ -100,6 +102,46 @@ func (f *fakeCluster) progress(namespace string, versions ...workflow) {
 
 func (f *fakeCluster) forbid(namespace string) {
 	f.forbidden[namespace] = true
+}
+
+func (f *fakeCluster) readOnly(namespace string) {
+	f.unwritable[namespace] = true
+}
+
+type written struct {
+	method, contentType string
+	body                map[string]any
+}
+
+func (f *fakeCluster) write(w http.ResponseWriter, r *http.Request, namespace string) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/apis/argoproj.io/v1alpha1/namespaces/"), "/")
+	if f.unwritable[namespace] {
+		w.WriteHeader(http.StatusForbidden)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"apiVersion": "v1", "kind": "Status", "status": "Failure", "reason": "Forbidden", "code": 403,
+			"message": `workflows.argoproj.io is forbidden: User "dev@example.test" cannot ` + strings.ToLower(r.Method) + ` resource "workflows"`,
+		})
+		return
+	}
+	var body map[string]any
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	f.writes = append(f.writes, written{method: r.Method, contentType: r.Header.Get("Content-Type"), body: body})
+	if r.Method == http.MethodPost {
+		generateName := body["metadata"].(map[string]any)["generateName"].(string)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"apiVersion": body["apiVersion"], "kind": body["kind"], "spec": body["spec"],
+			"metadata": map[string]any{"name": generateName + "r3run", "generateName": generateName},
+		})
+		return
+	}
+	for _, run := range f.byNS[namespace] {
+		if run["metadata"].(map[string]any)["name"] == parts[2] {
+			run["spec"].(map[string]any)["shutdown"] = "Stop"
+			_ = json.NewEncoder(w).Encode(run)
+			return
+		}
+	}
+	http.NotFound(w, r)
 }
 
 func (f *fakeCluster) podLog(namespace, pod, text string) {
@@ -138,6 +180,10 @@ func (f *fakeCluster) serve(w http.ResponseWriter, r *http.Request) {
 			"apiVersion": "v1", "kind": "Status", "status": "Failure", "reason": "Forbidden", "code": 403,
 			"message": `workflows.argoproj.io is forbidden: User "dev@example.test" cannot list resource "workflows"`,
 		})
+		return
+	}
+	if r.Method != http.MethodGet {
+		f.write(w, r, parts[0])
 		return
 	}
 	if len(parts) == 3 {

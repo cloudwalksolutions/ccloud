@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
@@ -124,6 +125,46 @@ func Get(ctx context.Context, cfg *rest.Config, namespace, name string) (Run, er
 		return Run{}, err
 	}
 	return decode(item)
+}
+
+func Cancel(ctx context.Context, cfg *rest.Config, namespace, name string) error {
+	client, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return err
+	}
+	_, err = client.Resource(resource).Namespace(namespace).Patch(ctx, name, types.MergePatchType, []byte(`{"spec":{"shutdown":"Stop"}}`), metav1.PatchOptions{})
+	return err
+}
+
+func Rerun(ctx context.Context, cfg *rest.Config, namespace, name string) (string, error) {
+	client, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return "", err
+	}
+	runs := client.Resource(resource).Namespace(namespace)
+	original, err := runs.Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	spec, _, _ := unstructured.NestedMap(original.Object, "spec")
+	delete(spec, "shutdown")
+	labels := map[string]any{}
+	for key, value := range original.GetLabels() {
+		if !strings.HasPrefix(key, "workflows.argoproj.io/") {
+			labels[key] = value
+		}
+	}
+	rerun := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": resource.GroupVersion().String(),
+		"kind":       "Workflow",
+		"metadata":   map[string]any{"generateName": original.GetGenerateName(), "labels": labels},
+		"spec":       spec,
+	}}
+	created, err := runs.Create(ctx, rerun, metav1.CreateOptions{})
+	if err != nil {
+		return "", err
+	}
+	return created.GetName(), nil
 }
 
 func List(ctx context.Context, cfg *rest.Config, namespace, selector string) ([]Run, error) {
