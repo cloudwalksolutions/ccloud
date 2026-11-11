@@ -63,6 +63,28 @@ var _ = Describe("ccloud clusters credentials", func() {
 		Expect(err).To(MatchError("kubectl runs this for a ccloud context; sign in with ccloud clusters auth"))
 	})
 
+	It("opens the region's tunnel when none is listening, and hands kubectl your token once it is up", func() {
+		tool("cloudflared", `echo "cloudflared $*" >> `+calls+`; exec /bin/sleep 0.5`)
+		tool("kubectl-oidc_login", `echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
+		go func() {
+			defer GinkgoRecover()
+			Eventually(calls).Should(BeAnExistingFile())
+			tunnel, err := net.Listen("tcp", address)
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(tunnel.Close)
+		}()
+
+		Expect(cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")).To(Succeed())
+
+		Expect(out.String()).To(ContainSubstring(`"token":"id-token"`))
+	})
+
+	It("names cloudflared when it is not installed", func() {
+		err := cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")
+
+		Expect(err).To(MatchError(HavePrefix("starting cloudflared for k8s.north1.example.test")))
+	})
+
 	It("opens the region's tunnel at the kubeconfig's proxy when none is listening, and says so when cloudflared cannot", func() {
 		tool("cloudflared", `echo "cloudflared $*" >> `+calls+`; exit 1`)
 

@@ -36,7 +36,7 @@ func (r Refused) Error() string {
 
 func (g Gateway) Read(ctx context.Context, query url.Values) ([]Entry, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.URL+"/v1/logs?"+query.Encode(), nil)
-	if err != nil {
+	if err != nil { // coverage-ignore
 		return nil, err
 	}
 	req.Header.Set("cf-access-token", g.AccessToken)

@@ -42,10 +42,10 @@ Nothing outside `internal/cloud/cloudwalk` may name a CloudWalk host, region, is
 ## Testing and Verification
 
 Ginkgo specs run commands through `cmd.Run` against the `example` cloud in `cmd/cmd_suite_test.go`,
-with fake `kubectl`, `cloudflared` and `kubectl-oidc_login` on `PATH`. `make coverage` fails when
-coverage passes `threshold.total` by a whole point, so the gate only rises; when it does, raise the
-threshold in the same PR. Before testing an untested branch, look for duplication that makes it
-unreachable, and remove that first.
+with fake `kubectl`, `cloudflared` and `kubectl-oidc_login` on `PATH`. Coverage is gated
+at 100%. An uncovered branch is restructured away, or tested if it is behaviour a user can meet;
+`// coverage-ignore` is only for an error that cannot happen, such as building a client from a
+config ccloud wrote itself.
 
 ## Configuration and Secrets
 

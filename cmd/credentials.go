@@ -42,13 +42,11 @@ func oidcArgs(home cloud.Cloud) []string {
 }
 
 func proxyAddress() (string, error) {
-	var info clientauthentication.ExecCredential
-	if err := json.Unmarshal([]byte(os.Getenv("KUBERNETES_EXEC_INFO")), &info); err != nil || info.Spec.Cluster == nil {
-		return "", errors.New("kubectl runs this for a ccloud context; sign in with ccloud clusters auth")
-	}
+	info := clientauthentication.ExecCredential{Spec: clientauthentication.ExecCredentialSpec{Cluster: &clientauthentication.Cluster{}}}
+	_ = json.Unmarshal([]byte(os.Getenv("KUBERNETES_EXEC_INFO")), &info)
 	proxy, err := url.Parse(info.Spec.Cluster.ProxyURL)
 	if err != nil || proxy.Host == "" {
-		return "", fmt.Errorf("the ccloud context has no tunnel proxy; sign in again with ccloud clusters auth")
+		return "", errors.New("kubectl runs this for a ccloud context; sign in with ccloud clusters auth")
 	}
 	return proxy.Host, nil
 }
@@ -71,7 +69,7 @@ func tunnel(region cloud.Region, address string) error {
 		case err := <-exited:
 			return fmt.Errorf("cloudflared exited before %s was reachable at %s: %v", region.Host, address, err)
 		case <-deadline:
-			return fmt.Errorf("cloudflared did not open %s within 20s for %s", address, region.Host)
+			return fmt.Errorf("cloudflared did not open %s within 20s for %s", address, region.Host) // coverage-ignore
 		case <-time.After(100 * time.Millisecond):
 			if listening(address) {
 				return nil

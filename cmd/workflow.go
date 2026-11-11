@@ -68,7 +68,7 @@ func ciCmd(home cloud.Cloud, command *cobra.Command, action func(*cobra.Command,
 			return signInError(err, region)
 		}
 		runs, err := workflows.In(cfg, "ci-"+app)
-		if err != nil {
+		if err != nil { // coverage-ignore
 			return err
 		}
 		return action(c, region, app, runs)

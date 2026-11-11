@@ -75,6 +75,14 @@ var _ = Describe("ccloud workflow logs", func() {
 		Expect(lines(out)).To(HaveExactElements("lint\t"+long, "lint\tlast"))
 	})
 
+	It("says why the gateway would not give a step's log once its pod is gone", func() {
+		gateway.refuse = http.StatusForbidden
+
+		err := run("workflow", "logs", "api-tests-x7k2p", "-a", "shop", "-r", "north1")
+
+		Expect(err).To(MatchError("the logs gateway answered 403 Forbidden: dev@example.test may not read logs in prod-shop"))
+	})
+
 	It("passes over a step that never ran, which has no log anywhere", func() {
 		ci.workflows("ci-shop", ciRun("release-m4k2p", started).flow("release").finished("Succeeded", time.Minute).
 			step("release-m4k2p-1", "build", "Succeeded", started, 30*time.Second, "").

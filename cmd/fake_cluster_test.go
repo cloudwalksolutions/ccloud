@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -224,6 +225,9 @@ func (f *fakeCluster) get(w http.ResponseWriter, namespace, name string) {
 			if len(f.versions) > 1 {
 				f.versions = f.versions[1:]
 				f.byNS[namespace][i] = f.versions[0]
+			}
+			if f.byNS[namespace][i] == nil {
+				f.byNS[namespace] = slices.Delete(f.byNS[namespace], i, i+1)
 			}
 			_ = json.NewEncoder(w).Encode(run)
 			return

@@ -174,6 +174,14 @@ esac`)
 		Expect(gateway.asked[0].Header.Get("cf-access-token")).To(Equal("access-jwt"))
 	})
 
+	It("says so when something other than the gateway answers, such as Access's login page", func() {
+		gateway.answers = []string{"<!DOCTYPE html><title>Sign in ・ Cloudflare Access</title>"}
+
+		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
+
+		Expect(err).To(MatchError(HavePrefix("the logs gateway answered something other than logs")))
+	})
+
 	It("says so when Cloudflare Access would not sign you in, and asks the gateway nothing", func() {
 		bin := GinkgoT().TempDir()
 		GinkgoT().Setenv("PATH", bin)

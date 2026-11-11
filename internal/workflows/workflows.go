@@ -111,7 +111,7 @@ func (r Run) Elapsed(now time.Time) time.Duration {
 func decode(item *unstructured.Unstructured) (Run, error) {
 	run := Run{object: item}
 	raw, err := json.Marshal(item.Object)
-	if err != nil {
+	if err != nil { // coverage-ignore
 		return run, err
 	}
 	return run, json.Unmarshal(raw, &run)
@@ -124,11 +124,11 @@ type Runs struct {
 
 func In(cfg *rest.Config, namespace string) (Runs, error) {
 	workflows, err := dynamic.NewForConfig(cfg)
-	if err != nil {
+	if err != nil { // coverage-ignore
 		return Runs{}, err
 	}
 	pods, err := corev1client.NewForConfig(cfg)
-	if err != nil {
+	if err != nil { // coverage-ignore
 		return Runs{}, err
 	}
 	return Runs{workflows: workflows.Resource(resource).Namespace(namespace), pods: pods.Pods(namespace)}, nil
@@ -183,7 +183,7 @@ func (r Runs) List(ctx context.Context, selector string) ([]Run, error) {
 	runs := make([]Run, 0, len(list.Items))
 	for i := range list.Items {
 		run, err := decode(&list.Items[i])
-		if err != nil {
+		if err != nil { // coverage-ignore
 			return nil, err
 		}
 		runs = append(runs, run)
