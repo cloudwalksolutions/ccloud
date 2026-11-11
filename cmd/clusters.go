@@ -51,7 +51,9 @@ func clustersCmd(home cloud.Cloud) *cobra.Command {
 func regionCmd(home cloud.Cloud, command *cobra.Command, run func(*cobra.Command, cloud.Region) error) *cobra.Command {
 	var name string
 	command.Flags().StringVarP(&name, "region", "r", "", "the "+home.Name+" region: "+strings.Join(home.Names(), ", "))
-	command.Args = cobra.NoArgs
+	if command.Args == nil {
+		command.Args = cobra.NoArgs
+	}
 	command.RunE = func(c *cobra.Command, _ []string) error {
 		if name == "" {
 			return fmt.Errorf("which region? %s --region <region>, where <region> is one of %s", c.CommandPath(), strings.Join(home.Names(), ", "))

@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	api "k8s.io/client-go/tools/clientcmd/api"
 
@@ -51,6 +52,17 @@ func Use(path, context, namespace string) error {
 		cfg.Contexts[context].Namespace = namespace
 	}
 	return clientcmd.WriteToFile(*cfg, path)
+}
+
+func REST(path, context string) (*rest.Config, error) {
+	cfg, err := clientcmd.LoadFromFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("reading %s: %w", path, err)
+	}
+	if cfg == nil || cfg.Contexts[context] == nil {
+		return nil, ErrNoContext
+	}
+	return clientcmd.NewNonInteractiveClientConfig(*cfg, context, &clientcmd.ConfigOverrides{}, nil).ClientConfig()
 }
 
 func Merge(path string, entry *api.Config) error {

@@ -18,7 +18,7 @@ var _ = Describe("ccloud --help", func() {
 
 	It("speaks of the cloud it was built for, with that cloud's regions in its examples", func() {
 		Expect(help()).To(ContainSubstring("example"))
-		for _, page := range []string{help(), help("clusters", "auth"), help("clusters", "set-context")} {
+		for _, page := range []string{help(), help("clusters", "auth"), help("clusters", "set-context"), help("workflow", "list"), help("workflow", "view")} {
 			Expect(page).NotTo(ContainSubstring("datacenter"))
 			Expect(page).NotTo(ContainSubstring("us-central1"))
 		}
