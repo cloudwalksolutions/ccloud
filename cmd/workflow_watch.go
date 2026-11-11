@@ -23,7 +23,11 @@ func workflowWatch(c *cobra.Command, region cloud.Region, app string, runs workf
 			render(out, run, time.Now())
 			fmt.Fprintf(out, "\nLooking again every %s; Ctrl-C stops watching, not the run.\n", interval)
 		}
-		time.Sleep(interval)
+		select {
+		case <-c.Context().Done():
+			return nil
+		case <-time.After(interval):
+		}
 		run, err = getRun(c, runs, region, app)
 	}
 	if err != nil {

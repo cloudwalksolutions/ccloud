@@ -42,6 +42,19 @@ var _ = Describe("ccloud clusters credentials", func() {
 		GinkgoT().Setenv("KUBERNETES_EXEC_INFO", `{"apiVersion":"client.authentication.k8s.io/v1","kind":"ExecCredential","spec":{"interactive":true,"cluster":{"server":"https://api.example.test","proxy-url":"socks5://`+address+`"}}}`)
 	})
 
+	It("stops waiting for your sign-in when kubectl gives up", func(ctx SpecContext) {
+		tunnel, err := net.Listen("tcp", address)
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(tunnel.Close)
+		tool("kubectl-oidc_login", `exec /bin/sleep 5`)
+		interrupted, interrupt := context.WithCancel(ctx)
+		time.AfterFunc(100*time.Millisecond, interrupt)
+
+		err = cmd.RunContext(interrupted, []string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")
+
+		Expect(err).To(HaveOccurred())
+	}, SpecTimeout(3*time.Second))
+
 	It("hands kubectl your token from the cloud's issuer over the tunnel already open, without opening another", func() {
 		tunnel, err := net.Listen("tcp", address)
 		Expect(err).NotTo(HaveOccurred())

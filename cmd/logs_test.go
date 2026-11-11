@@ -190,6 +190,18 @@ esac`)
 		Expect(err).To(MatchError(HavePrefix("the logs gateway answered something other than logs")))
 	})
 
+	It("stops waiting for your Access sign-in when you press Ctrl-C", func(ctx SpecContext) {
+		bin := GinkgoT().TempDir()
+		GinkgoT().Setenv("PATH", bin)
+		tool(bin, "cloudflared", `[ "$2" = "login" ] && exec /bin/sleep 5; exit 1`)
+		interrupted, interrupt := context.WithCancel(ctx)
+		time.AfterFunc(100*time.Millisecond, interrupt)
+
+		Expect(cmd.RunContext(interrupted, []string{"logs", "-a", "shop", "-e", "prod", "-r", "north1"}, out, out, home, "dev")).To(Succeed())
+
+		Expect(gateway.asked).To(BeEmpty())
+	}, SpecTimeout(3*time.Second))
+
 	It("says so when Cloudflare Access would not sign you in, and asks the gateway nothing", func() {
 		bin := GinkgoT().TempDir()
 		GinkgoT().Setenv("PATH", bin)

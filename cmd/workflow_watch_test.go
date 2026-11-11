@@ -2,6 +2,7 @@ package cmd_test
 
 import (
 	"bytes"
+	"context"
 	"path/filepath"
 	"strings"
 	"time"
@@ -70,6 +71,16 @@ var _ = Describe("ccloud workflow watch", func() {
 		Expect(screens[2]).To(ContainSubstring("✓ lint in 41s"))
 		Expect(screens[2]).To(HaveSuffix("✓ api-tests-x7k2p completed: Succeeded\n"))
 	})
+
+	It("stops watching at once when you press Ctrl-C, without calling it a failure", func(ctx SpecContext) {
+		ci.workflows("ci-shop", ciRun("api-tests-x7k2p", time.Now()).flow("api-tests").running())
+		interrupted, interrupt := context.WithCancel(ctx)
+		time.AfterFunc(100*time.Millisecond, interrupt)
+
+		err := cmd.RunContext(interrupted, []string{"workflow", "watch", "api-tests-x7k2p", "-a", "shop", "-r", "north1", "-i", "1h"}, out, out, example, "dev")
+
+		Expect(err).NotTo(HaveOccurred())
+	}, SpecTimeout(3*time.Second))
 
 	It("says so when the run is deleted while you watch it", func() {
 		ci.progress("ci-shop", ciRun("api-tests-x7k2p", time.Now()).flow("api-tests").running(), nil)

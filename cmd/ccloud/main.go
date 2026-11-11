@@ -18,6 +18,7 @@ var (
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	context.AfterFunc(ctx, stop)
 	release := fmt.Sprintf("%s (commit %s, built %s)", version, commit, date)
 	err := cmd.RunContext(ctx, os.Args[1:], os.Stdout, os.Stderr, cloudwalk.Cloud(), release)
 	stop()

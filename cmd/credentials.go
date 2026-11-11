@@ -26,7 +26,7 @@ func credentials(c *cobra.Command, home cloud.Cloud, region cloud.Region) error 
 	if err := tunnel(c.Context(), region, address); err != nil {
 		return err
 	}
-	token := exec.Command("kubectl-oidc_login", oidcArgs(home)...)
+	token := exec.CommandContext(c.Context(), "kubectl-oidc_login", oidcArgs(home)...)
 	token.Stdin, token.Stdout, token.Stderr = c.InOrStdin(), c.OutOrStdout(), c.ErrOrStderr()
 	return token.Run()
 }
