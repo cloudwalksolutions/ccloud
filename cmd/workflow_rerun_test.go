@@ -28,6 +28,15 @@ var _ = Describe("ccloud workflow rerun", func() {
 		ci.signIn("north1")
 	})
 
+	It("says so when the cluster does not let you start the app's runs", func() {
+		ci.workflows("ci-shop", ciRun("api-tests-x7k2p", time.Now().Add(-time.Hour)).flow("api-tests").finished("Failed", time.Minute))
+		ci.readOnly("ci-shop")
+
+		err := run("workflow", "rerun", "api-tests-x7k2p", "-a", "shop", "-r", "north1")
+
+		Expect(err).To(MatchError("you may not cancel or rerun shop's runs in north1 (ci-shop)"))
+	})
+
 	It("starts a new run of the same flow, for the same pull request and commit, without Argo's own bookkeeping", func() {
 		original := ciRun("api-tests-x7k2p", time.Now().Add(-time.Hour)).flow("api-tests").
 			pr("105", "3f9a2c4e1d", "feat/BOAT-105/search").finished("Failed", time.Minute).

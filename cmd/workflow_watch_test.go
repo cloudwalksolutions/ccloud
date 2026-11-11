@@ -71,6 +71,14 @@ var _ = Describe("ccloud workflow watch", func() {
 		Expect(screens[2]).To(HaveSuffix("✓ api-tests-x7k2p completed: Succeeded\n"))
 	})
 
+	It("says so when the run is deleted while you watch it", func() {
+		ci.progress("ci-shop", ciRun("api-tests-x7k2p", time.Now()).flow("api-tests").running(), nil)
+
+		err := run("workflow", "watch", "api-tests-x7k2p", "-a", "shop", "-r", "north1", "-i", "1ms")
+
+		Expect(err).To(MatchError("shop has no run api-tests-x7k2p in north1; see ccloud workflow list -a shop -r north1"))
+	})
+
 	It("waits for a run still going, then says how it ended", func() {
 		started := time.Now().Add(-time.Minute)
 		ci.progress("ci-shop",

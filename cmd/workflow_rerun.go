@@ -9,16 +9,8 @@ import (
 	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
-func workflowRerun(c *cobra.Command, region cloud.Region, app string) error {
-	cfg, err := signedInTo(region)
-	if err != nil {
-		return err
-	}
-	run, err := getRun(c, cfg, region, app)
-	if err != nil {
-		return err
-	}
-	started, err := workflows.Rerun(c.Context(), cfg, "ci-"+app, run.Name())
+func workflowRerun(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs, run workflows.Run) error {
+	started, err := runs.Rerun(c.Context(), run)
 	if err != nil {
 		return errMayNotChange(err, region, app)
 	}

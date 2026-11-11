@@ -3,9 +3,11 @@ package cmd_test
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -40,6 +42,11 @@ func (w workflow) pr(number, sha, branch string) workflow {
 	arguments := w["spec"].(map[string]any)["arguments"].(map[string]any)
 	arguments["parameters"] = append(arguments["parameters"].([]any), map[string]any{"name": "revision", "value": branch})
 	return w.label("pr", number).label("sha", sha)
+}
+
+func (w workflow) queued() workflow {
+	delete(w["status"].(map[string]any), "startedAt")
+	return w
 }
 
 func (w workflow) running() workflow {
@@ -86,7 +93,7 @@ type fakeCluster struct {
 
 func newFakeCluster() *fakeCluster {
 	f := &fakeCluster{byNS: map[string][]workflow{}, forbidden: map[string]bool{}, logs: map[string]string{}, unwritable: map[string]bool{}}
-	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
+	f.server = httptest.NewTLSServer(http.HandlerFunc(f.serve))
 	DeferCleanup(f.server.Close)
 	return f
 }
@@ -220,6 +227,9 @@ func (f *fakeCluster) get(w http.ResponseWriter, namespace, name string) {
 				f.versions = f.versions[1:]
 				f.byNS[namespace][i] = f.versions[0]
 			}
+			if f.byNS[namespace][i] == nil {
+				f.byNS[namespace] = slices.Delete(f.byNS[namespace], i, i+1)
+			}
 			_ = json.NewEncoder(w).Encode(run)
 			return
 		}
@@ -235,7 +245,8 @@ func (f *fakeCluster) get(w http.ResponseWriter, namespace, name string) {
 func (f *fakeCluster) signIn(region string) {
 	cfg := api.NewConfig()
 	name := "ccloud-" + region
-	cfg.Clusters[name] = &api.Cluster{Server: f.server.URL}
+	authority := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.server.Certificate().Raw})
+	cfg.Clusters[name] = &api.Cluster{Server: f.server.URL, CertificateAuthorityData: authority}
 	cfg.AuthInfos[name] = &api.AuthInfo{Token: "dev-token"}
 	cfg.Contexts[name] = &api.Context{Cluster: name, AuthInfo: name}
 	cfg.CurrentContext = name

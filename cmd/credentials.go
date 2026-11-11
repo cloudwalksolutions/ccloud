@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,7 +23,7 @@ func credentials(c *cobra.Command, home cloud.Cloud, region cloud.Region) error 
 	if err != nil {
 		return err
 	}
-	if err := tunnel(region, address); err != nil {
+	if err := tunnel(c.Context(), region, address); err != nil {
 		return err
 	}
 	token := exec.Command("kubectl-oidc_login", oidcArgs(home)...)
@@ -42,18 +43,16 @@ func oidcArgs(home cloud.Cloud) []string {
 }
 
 func proxyAddress() (string, error) {
-	var info clientauthentication.ExecCredential
-	if err := json.Unmarshal([]byte(os.Getenv("KUBERNETES_EXEC_INFO")), &info); err != nil || info.Spec.Cluster == nil {
-		return "", errors.New("kubectl runs this for a ccloud context; sign in with ccloud clusters auth")
-	}
+	info := clientauthentication.ExecCredential{Spec: clientauthentication.ExecCredentialSpec{Cluster: &clientauthentication.Cluster{}}}
+	_ = json.Unmarshal([]byte(os.Getenv("KUBERNETES_EXEC_INFO")), &info)
 	proxy, err := url.Parse(info.Spec.Cluster.ProxyURL)
 	if err != nil || proxy.Host == "" {
-		return "", fmt.Errorf("the ccloud context has no tunnel proxy; sign in again with ccloud clusters auth")
+		return "", errors.New("kubectl runs this for a ccloud context; sign in with ccloud clusters auth")
 	}
 	return proxy.Host, nil
 }
 
-func tunnel(region cloud.Region, address string) error {
+func tunnel(ctx context.Context, region cloud.Region, address string) error {
 	if listening(address) {
 		return nil
 	}
@@ -65,13 +64,14 @@ func tunnel(region cloud.Region, address string) error {
 	exited := make(chan error, 1)
 	go func() { exited <- cloudflared.Wait() }()
 
-	deadline := time.After(20 * time.Second)
+	ctx, stop := context.WithTimeout(ctx, 20*time.Second)
+	defer stop()
 	for {
 		select {
 		case err := <-exited:
 			return fmt.Errorf("cloudflared exited before %s was reachable at %s: %v", region.Host, address, err)
-		case <-deadline:
-			return fmt.Errorf("cloudflared did not open %s within 20s for %s", address, region.Host)
+		case <-ctx.Done():
+			return fmt.Errorf("cloudflared did not open %s for %s in time", address, region.Host)
 		case <-time.After(100 * time.Millisecond):
 			if listening(address) {
 				return nil

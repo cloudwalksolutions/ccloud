@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -62,6 +63,24 @@ var _ = Describe("ccloud workflow logs", func() {
 		Expect(run("workflow", "logs", "api-tests-x7k2p", "-a", "shop", "-r", "north1")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements("lint\tok 12 files", "unit\tFAIL auth", "unit\texit 1"))
+	})
+
+	It("prints a line however long it is, as a minified bundle or stats dump can be", func() {
+		long := strings.Repeat("x", 100_000)
+		ci.podLog("ci-shop", "api-tests-x7k2p-lint-1", long+"\nlast")
+		ci.podLog("ci-shop", "api-tests-x7k2p-unit-2", "")
+
+		Expect(run("workflow", "logs", "api-tests-x7k2p", "-a", "shop", "-r", "north1")).To(Succeed())
+
+		Expect(lines(out)).To(HaveExactElements("lint\t"+long, "lint\tlast"))
+	})
+
+	It("says why the gateway would not give a step's log once its pod is gone", func() {
+		gateway.refuse = http.StatusForbidden
+
+		err := run("workflow", "logs", "api-tests-x7k2p", "-a", "shop", "-r", "north1")
+
+		Expect(err).To(MatchError("the logs gateway answered 403 Forbidden: dev@example.test may not read logs in prod-shop"))
 	})
 
 	It("passes over a step that never ran, which has no log anywhere", func() {

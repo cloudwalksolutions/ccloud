@@ -21,7 +21,7 @@ unit:            ## Unit tests with the race detector
 .PHONY: coverage
 coverage:        ## The coverage gate CI enforces
 	go test -count=1 ./... -coverprofile=cover.out -covermode=atomic -coverpkg=./...
-	go run github.com/vladopajic/go-test-coverage/v2@latest --config=./.testcoverage.yml
+	go run github.com/vladopajic/go-test-coverage/v2@v2.23.0 --config=./.testcoverage.yml
 
 .PHONY: check
 check: lint build unit coverage  ## The local gate

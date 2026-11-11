@@ -2,9 +2,11 @@ package cmd_test
 
 import (
 	"bytes"
+	"context"
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,6 +55,46 @@ var _ = Describe("ccloud clusters credentials", func() {
 		recorded, _ := os.ReadFile(calls)
 		Expect(string(recorded)).NotTo(ContainSubstring("cloudflared"))
 		Expect(string(recorded)).To(ContainSubstring("get-token --oidc-issuer-url=https://issuer.example.test --oidc-client-id=client.example.test --oidc-client-secret=public-desktop-secret --oidc-extra-scope=email"))
+	})
+
+	It("sends you to sign in when run by hand rather than by kubectl for a ccloud context", func() {
+		GinkgoT().Setenv("KUBERNETES_EXEC_INFO", "")
+
+		err := cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")
+
+		Expect(err).To(MatchError("kubectl runs this for a ccloud context; sign in with ccloud clusters auth"))
+	})
+
+	It("opens the region's tunnel when none is listening, and hands kubectl your token once it is up", func() {
+		tool("cloudflared", `echo "cloudflared $*" >> `+calls+`; exec /bin/sleep 0.5`)
+		tool("kubectl-oidc_login", `echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
+		go func() {
+			defer GinkgoRecover()
+			Eventually(calls).Should(BeAnExistingFile())
+			tunnel, err := net.Listen("tcp", address)
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(tunnel.Close)
+		}()
+
+		Expect(cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")).To(Succeed())
+
+		Expect(out.String()).To(ContainSubstring(`"token":"id-token"`))
+	})
+
+	It("gives up on a cloudflared that never opens the tunnel, when kubectl stops waiting", func(ctx SpecContext) {
+		tool("cloudflared", `exec /bin/sleep 2`)
+		impatient, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+		defer cancel()
+
+		err := cmd.RunContext(impatient, []string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")
+
+		Expect(err).To(MatchError("cloudflared did not open " + address + " for k8s.north1.example.test in time"))
+	}, SpecTimeout(5*time.Second))
+
+	It("names cloudflared when it is not installed", func() {
+		err := cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")
+
+		Expect(err).To(MatchError(HavePrefix("starting cloudflared for k8s.north1.example.test")))
 	})
 
 	It("opens the region's tunnel at the kubeconfig's proxy when none is listening, and says so when cloudflared cannot", func() {

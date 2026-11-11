@@ -7,22 +7,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
+	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
 const clearScreen = "\x1b[H\x1b[2J"
 
-func workflowWatch(c *cobra.Command, region cloud.Region, app string) error {
-	cfg, err := signedInTo(region)
-	if err != nil {
-		return err
-	}
-	interval, err := c.Flags().GetDuration("interval")
-	if err != nil {
-		return err
-	}
+func workflowWatch(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs, run workflows.Run) error {
+	interval, _ := c.Flags().GetDuration("interval")
 	out := c.OutOrStdout()
 	redraw := terminal(out)
-	run, err := getRun(c, cfg, region, app)
+	var err error
 	for err == nil && run.Status.FinishedAt.IsZero() {
 		if redraw {
 			fmt.Fprint(out, clearScreen)
@@ -30,7 +24,7 @@ func workflowWatch(c *cobra.Command, region cloud.Region, app string) error {
 			fmt.Fprintf(out, "\nLooking again every %s; Ctrl-C stops watching, not the run.\n", interval)
 		}
 		time.Sleep(interval)
-		run, err = getRun(c, cfg, region, app)
+		run, err = getRun(c, runs, region, app)
 	}
 	if err != nil {
 		return err

@@ -17,16 +17,14 @@ type logPrinter struct {
 	colour palette
 }
 
-func (p logPrinter) print(entry logs.Entry) error {
+func (p logPrinter) print(entry logs.Entry) {
 	switch p.format {
 	case "raw":
-		_, err := fmt.Fprintln(p.out, entry.Line)
-		return err
+		fmt.Fprintln(p.out, entry.Line)
 	case "json":
-		return json.NewEncoder(p.out).Encode(entry)
+		_ = json.NewEncoder(p.out).Encode(entry)
 	default:
-		_, err := fmt.Fprintf(p.out, "%s %s %s\n", p.colour.paint("90", entry.Time.Local().Format("15:04:05")), entry.Pod, p.readable(entry.Line))
-		return err
+		fmt.Fprintf(p.out, "%s %s %s\n", p.colour.paint("90", entry.Time.Local().Format("15:04:05")), entry.Pod, p.readable(entry.Line))
 	}
 }
 

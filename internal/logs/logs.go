@@ -20,7 +20,7 @@ type Entry struct {
 }
 
 type Gateway struct {
-	URL         string
+	URL         *url.URL
 	AccessToken string
 	IDToken     string
 }
@@ -30,15 +30,16 @@ type Refused struct {
 	Reason string
 }
 
-func (r Refused) Error() string { return r.Reason }
+func (r Refused) Error() string {
+	return fmt.Sprintf("the logs gateway answered %d %s: %s", r.Status, http.StatusText(r.Status), r.Reason)
+}
 
 func (g Gateway) Read(ctx context.Context, query url.Values) ([]Entry, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.URL+"/v1/logs?"+query.Encode(), nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("cf-access-token", g.AccessToken)
-	req.Header.Set("Authorization", "Bearer "+g.IDToken)
+	address := g.URL.ResolveReference(&url.URL{Path: "/v1/logs", RawQuery: query.Encode()})
+	req := (&http.Request{Method: http.MethodGet, URL: address, Header: http.Header{
+		"Cf-Access-Token": {g.AccessToken},
+		"Authorization":   {"Bearer " + g.IDToken},
+	}}).WithContext(ctx)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err

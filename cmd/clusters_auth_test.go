@@ -39,6 +39,27 @@ var _ = Describe("ccloud clusters auth", func() {
 		tool("kubectl-oidc_login", "exit 0")
 	})
 
+	It("names your kubeconfig's directory when it cannot write there", func() {
+		Expect(os.MkdirAll(filepath.Dir(kubeconfig), 0o500)).To(Succeed())
+
+		err := run("clusters", "auth", "--region", "north1")
+
+		Expect(err).To(MatchError(ContainSubstring(filepath.Dir(kubeconfig))))
+		Expect(kubeconfig).NotTo(BeAnExistingFile())
+	})
+
+	It("leaves a kubeconfig it cannot read as it was, naming it", func() {
+		existing := []byte("contexts: [this is not a kubeconfig")
+		Expect(os.MkdirAll(filepath.Dir(kubeconfig), 0o700)).To(Succeed())
+		Expect(os.WriteFile(kubeconfig, existing, 0o600)).To(Succeed())
+		tool("kubectl", `echo "Username  dev@example.test"`)
+
+		err := run("clusters", "auth", "--region", "north1")
+
+		Expect(err).To(MatchError(HavePrefix("reading " + kubeconfig)))
+		Expect(os.ReadFile(kubeconfig)).To(Equal(existing))
+	})
+
 	It("leaves your kubeconfig as it was when signing in fails, and says why", func() {
 		existing := []byte("apiVersion: v1\nkind: Config\ncurrent-context: work\ncontexts:\n- name: work\n  context: {cluster: work, user: work}\nclusters:\n- name: work\n  cluster: {server: https://work.example}\nusers:\n- name: work\n  user: {token: t}\n")
 		Expect(os.MkdirAll(filepath.Dir(kubeconfig), 0o700)).To(Succeed())
@@ -72,6 +93,7 @@ var _ = Describe("ccloud clusters auth", func() {
 		_, err = clientcmd.NewNonInteractiveClientConfig(*cfg, "ccloud-north1", &clientcmd.ConfigOverrides{}, nil).ClientConfig()
 		Expect(err).NotTo(HaveOccurred(), "kubectl must accept the context as written")
 		exec := cfg.AuthInfos[cfg.Contexts["ccloud-north1"].AuthInfo].Exec
+		Expect(exec.Command).To(Equal("ccloud"), "by name, so an upgrade that moves the binary keeps the context working")
 		Expect(exec.Args).To(Equal([]string{"clusters", "credentials", "--region", "north1"}))
 		Expect(exec.ProvideClusterInfo).To(BeTrue(), "credentials finds its tunnel through the proxy-url kubectl passes it")
 		Expect(out.String()).To(ContainSubstring("dev@example.test"))
