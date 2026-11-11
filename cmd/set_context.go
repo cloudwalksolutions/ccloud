@@ -17,12 +17,16 @@ func setContext(c *cobra.Command, region cloud.Region) error {
 	}
 	err = kubeconfig.Use(kubeconfig.Path(), region.Context(), namespace)
 	if errors.Is(err, kubeconfig.ErrNoContext) {
-		return fmt.Errorf("you have not signed in to %s yet; run ccloud clusters auth --region %s", region.Name, region.Name)
+		return errNoSignInFor(region)
 	}
 	if err != nil {
 		return err
 	}
 	return switched(c, region)
+}
+
+func errNoSignInFor(region cloud.Region) error {
+	return fmt.Errorf("you have not signed in to %s yet; run ccloud clusters auth --region %s", region.Name, region.Name)
 }
 
 func switched(c *cobra.Command, region cloud.Region) error {

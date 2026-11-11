@@ -17,7 +17,7 @@ func Run(args []string, stdout, stderr io.Writer, home cloud.Cloud, version stri
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.AddCommand(clustersCmd(home))
+	root.AddCommand(clustersCmd(home), workflowCmd(home))
 	root.SetArgs(args)
 	root.SetOut(stdout)
 	root.SetErr(stderr)

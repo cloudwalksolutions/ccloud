@@ -23,6 +23,17 @@ may do is decided by the cluster, never by ccloud.
 `clusters set-context` switches between regions you have signed in to, and with `--namespace` sets
 the namespace kubectl uses there.
 
+## Workflows
+
+```sh
+ccloud workflow list -a <app> -r us-east1 --pr 105
+ccloud workflow view api-tests-x7k2p -a <app> -r us-east1
+```
+
+Your app's CI runs, read through the cluster you signed in to with `clusters auth`. `list` shows
+each run's result, flow, pull request, branch and timing, newest first; `view` shows a run's steps
+in the order they ran, how long each took, and why one failed.
+
 ## Your cloud
 
 A build of ccloud serves one cloud. Its regions, their Access hostnames and pinned CAs, the OIDC
