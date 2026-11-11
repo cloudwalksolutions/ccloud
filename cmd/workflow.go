@@ -48,6 +48,18 @@ func workflowCmd(home cloud.Cloud) *cobra.Command {
 	})
 	stepLogs.Flags().Bool("failed", false, "only the steps that failed")
 	workflow.AddCommand(stepLogs)
+	workflow.AddCommand(appCmd(home, &cobra.Command{
+		Use:     "cancel <run> --app <app> --region <region>",
+		Short:   "Stop a run still going; its exit handlers still report",
+		Example: "  ccloud workflow cancel api-tests-x7k2p -a <app> -r " + home.Regions[0].Name,
+		Args:    oneRun,
+	}, workflowCancel))
+	workflow.AddCommand(appCmd(home, &cobra.Command{
+		Use:     "rerun <run> --app <app> --region <region>",
+		Short:   "Start the run again from the beginning, for the same pull request and commit",
+		Example: "  ccloud workflow rerun api-tests-x7k2p -a <app> -r " + home.Regions[0].Name,
+		Args:    oneRun,
+	}, workflowRerun))
 	return workflow
 }
 
