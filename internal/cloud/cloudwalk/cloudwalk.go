@@ -34,5 +34,5 @@ func region(name, host string, port int) cloud.Region {
 	if err != nil {
 		panic(err)
 	}
-	return cloud.Region{Name: name, Host: host, Port: port, Authority: authority}
+	return cloud.Region{Name: name, Host: host, Port: port, Authority: authority, Logs: "https://logs." + name + ".cloudwalksolutions.net"}
 }

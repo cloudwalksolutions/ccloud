@@ -36,6 +36,20 @@ each run's result, flow, pull request, branch and timing, newest first; `view` s
 in the order they ran, how long each took, and why one failed. `watch` redraws that view until the
 run ends, and with `--exit-status` exits non-zero unless it succeeded.
 
+## Logs
+
+```sh
+ccloud logs -a <app> -e prod -r us-central1 -l error --since 6h
+ccloud logs -a <app> -e stage -r us-central1 -f -g checkout
+```
+
+An app's logs in one environment (`prod`, `stage`, `ci`, or a feature environment's name), kept
+for years, so a pod long gone still has them. The region's logs gateway reads them as you: it asks
+the cluster whether you may read that environment's pod logs, exactly as `kubectl logs` would.
+JSON lines print as `LEVEL message key=value`; `-o raw` gives each line as stored and `-o json` one
+entry per line. `-f` keeps reading until Ctrl-C. The first time, `cloudflared` opens your browser to
+sign in to Cloudflare Access.
+
 ## Your cloud
 
 A build of ccloud serves one cloud. Its regions, their Access hostnames and pinned CAs, the OIDC

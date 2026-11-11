@@ -25,6 +25,12 @@ func credentials(c *cobra.Command, home cloud.Cloud, region cloud.Region) error 
 	if err := tunnel(region, address); err != nil {
 		return err
 	}
+	token := exec.Command("kubectl-oidc_login", oidcArgs(home)...)
+	token.Stdin, token.Stdout, token.Stderr = c.InOrStdin(), c.OutOrStdout(), c.ErrOrStderr()
+	return token.Run()
+}
+
+func oidcArgs(home cloud.Cloud) []string {
 	args := []string{"get-token",
 		"--oidc-issuer-url=" + home.Issuer,
 		"--oidc-client-id=" + home.ClientID,
@@ -32,9 +38,7 @@ func credentials(c *cobra.Command, home cloud.Cloud, region cloud.Region) error 
 	for _, scope := range home.Scopes {
 		args = append(args, "--oidc-extra-scope="+scope)
 	}
-	token := exec.Command("kubectl-oidc_login", args...)
-	token.Stdin, token.Stdout, token.Stderr = c.InOrStdin(), c.OutOrStdout(), c.ErrOrStderr()
-	return token.Run()
+	return args
 }
 
 func proxyAddress() (string, error) {

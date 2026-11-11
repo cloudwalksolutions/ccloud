@@ -20,6 +20,7 @@ type Region struct {
 	Host      string
 	Port      int
 	Authority []byte
+	Logs      string
 }
 
 func (r Region) Context() string { return "ccloud-" + r.Name }

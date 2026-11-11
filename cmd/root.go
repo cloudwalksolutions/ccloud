@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -10,6 +11,10 @@ import (
 )
 
 func Run(args []string, stdout, stderr io.Writer, home cloud.Cloud, version string) error {
+	return RunContext(context.Background(), args, stdout, stderr, home, version)
+}
+
+func RunContext(ctx context.Context, args []string, stdout, stderr io.Writer, home cloud.Cloud, version string) error {
 	root := &cobra.Command{
 		Use:           "ccloud",
 		Version:       version,
@@ -17,9 +22,9 @@ func Run(args []string, stdout, stderr io.Writer, home cloud.Cloud, version stri
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.AddCommand(clustersCmd(home), workflowCmd(home))
+	root.AddCommand(clustersCmd(home), workflowCmd(home), logsCmd(home))
 	root.SetArgs(args)
 	root.SetOut(stdout)
 	root.SetErr(stderr)
-	return root.Execute()
+	return root.ExecuteContext(ctx)
 }

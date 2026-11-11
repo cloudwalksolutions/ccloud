@@ -29,4 +29,10 @@ var _ = Describe("the cloudwalk cloud", func() {
 			ports[region.Port] = region.Name
 		}
 	})
+
+	It("reads each region's logs through that region's own gateway, over HTTPS", func() {
+		for _, region := range cloudwalk.Cloud().Regions {
+			Expect(region.Logs).To(Equal("https://logs."+region.Name+".cloudwalksolutions.net"), region.Name)
+		}
+	})
 })
