@@ -1,19 +1,16 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"text/tabwriter"
 	"time"
 
-	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-
-	"github.com/cloudwalksolutions/ccloud/internal/cloud"
-	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
-func workflowList(c *cobra.Command, region cloud.Region, app string, ci workflows.Runs) error {
+func (c command) list(ctx context.Context) error {
 	selector := labels.Set{}
 	for _, flag := range []string{"flow", "pr"} {
 		if value, _ := c.Flags().GetString(flag); value != "" {
@@ -21,16 +18,15 @@ func workflowList(c *cobra.Command, region cloud.Region, app string, ci workflow
 		}
 	}
 	limit, _ := c.Flags().GetInt("limit")
-	namespace := "ci-" + app
-	runs, err := ci.List(c.Context(), selector.String())
+	runs, err := c.runs.List(ctx, selector.String())
 	if apierrors.IsForbidden(err) {
-		err = fmt.Errorf("you may not read %s's runs in %s (%s)", app, region.Name, namespace)
+		err = fmt.Errorf("you may not read %s's runs in %s (%s)", c.app, c.region.Name, c.ci())
 	}
 	if err != nil {
 		return err
 	}
 	if len(runs) == 0 {
-		_, err := fmt.Fprintf(c.OutOrStdout(), "No runs for %s in %s.\n", app, region.Name)
+		_, err := fmt.Fprintf(c.OutOrStdout(), "No runs for %s in %s.\n", c.app, c.region.Name)
 		return err
 	}
 	now := time.Now()
@@ -47,19 +43,6 @@ func workflowList(c *cobra.Command, region cloud.Region, app string, ci workflow
 			run.Elapsed(now).Round(time.Second), age(now.Sub(run.Metadata.CreationTimestamp)))
 	}
 	return table.Flush()
-}
-
-func symbol(phase string) string {
-	switch phase {
-	case "Succeeded":
-		return "✓"
-	case "Failed", "Error":
-		return "X"
-	case "Skipped", "Omitted":
-		return "-"
-	default:
-		return "*"
-	}
 }
 
 func short(sha string) string {

@@ -1,18 +1,16 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/spf13/cobra"
-
-	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
 const clearScreen = "\x1b[H\x1b[2J"
 
-func workflowWatch(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs, run workflows.Run) error {
+func (c command) watch(ctx context.Context, run workflows.Run) error {
 	interval, _ := c.Flags().GetDuration("interval")
 	out := c.OutOrStdout()
 	redraw := terminal(out)
@@ -24,7 +22,7 @@ func workflowWatch(c *cobra.Command, region cloud.Region, app string, runs workf
 			fmt.Fprintf(out, "\nLooking again every %s; Ctrl-C stops watching, not the run.\n", interval)
 		}
 		time.Sleep(interval)
-		run, err = getRun(c, runs, region, app)
+		run, err = c.getRun(ctx)
 	}
 	if err != nil {
 		return err

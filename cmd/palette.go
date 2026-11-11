@@ -35,14 +35,14 @@ func (p palette) paint(code, text string) string {
 }
 
 func (p palette) status(phase string) string {
-	switch symbol := symbol(phase); symbol {
-	case "✓":
-		return p.paint("32", symbol)
-	case "X":
-		return p.paint("31", symbol)
-	case "*":
-		return p.paint("33", symbol)
+	switch phase {
+	case "Succeeded":
+		return p.paint("32", "✓")
+	case "Failed", "Error":
+		return p.paint("31", "X")
+	case "Skipped", "Omitted":
+		return p.paint("90", "-")
 	default:
-		return p.paint("90", symbol)
+		return p.paint("33", "*")
 	}
 }

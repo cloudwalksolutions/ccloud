@@ -1,28 +1,27 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
-func workflowLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app string, runs workflows.Runs, run workflows.Run) error {
-	kept := &logReader{c: c, home: home, region: region}
+func (c command) stepLogs(ctx context.Context, run workflows.Run) error {
+	kept := &logReader{command: c}
 	onlyFailed, _ := c.Flags().GetBool("failed")
 	for _, step := range run.Steps() {
 		if step.StartedAt.IsZero() || (onlyFailed && !failed(step.Phase)) {
 			continue
 		}
-		text, err := runs.StepLog(c.Context(), run, step)
+		text, err := c.runs.StepLog(ctx, run, step)
 		if apierrors.IsNotFound(err) {
-			text, err = keptLog(kept, app, run, step)
+			text, err = kept.stepLog(ctx, run, step)
 		}
 		if err != nil {
 			return err
@@ -38,9 +37,9 @@ func failed(phase string) bool {
 	return phase == "Failed" || phase == "Error"
 }
 
-func keptLog(kept *logReader, app string, run workflows.Run, step workflows.Step) (string, error) {
-	entries, err := kept.read(url.Values{
-		"namespace": {"ci-" + app},
+func (r *logReader) stepLog(ctx context.Context, run workflows.Run, step workflows.Step) (string, error) {
+	entries, err := r.read(ctx, url.Values{
+		"namespace": {r.ci()},
 		"pod":       {run.PodName(step)},
 		"container": {"main"},
 		"start":     {step.StartedAt.UTC().Format(time.RFC3339)},
