@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -24,7 +23,7 @@ type command struct {
 
 func (c command) ci() string { return "ci-" + c.app }
 
-func regionCmd(home cloud.Cloud, cobraCmd *cobra.Command, run func(command, context.Context) error) *cobra.Command {
+func regionCmd(home cloud.Cloud, cobraCmd *cobra.Command, run func(command) error) *cobra.Command {
 	var name string
 	cobraCmd.Flags().StringVarP(&name, "region", "r", "", "the "+home.Name+" region: "+strings.Join(home.Names(), ", "))
 	if cobraCmd.Args == nil {
@@ -38,25 +37,25 @@ func regionCmd(home cloud.Cloud, cobraCmd *cobra.Command, run func(command, cont
 		if err != nil {
 			return err
 		}
-		return run(command{Command: c, home: home, region: region}, c.Context())
+		return run(command{Command: c, home: home, region: region})
 	}
 	return cobraCmd
 }
 
-func appCmd(home cloud.Cloud, cobraCmd *cobra.Command, run func(command, context.Context) error) *cobra.Command {
+func appCmd(home cloud.Cloud, cobraCmd *cobra.Command, run func(command) error) *cobra.Command {
 	var app string
 	cobraCmd.Flags().StringVarP(&app, "app", "a", "", "the app, as it is named in its namespaces")
-	return regionCmd(home, cobraCmd, func(c command, ctx context.Context) error {
+	return regionCmd(home, cobraCmd, func(c command) error {
 		if app == "" {
 			return fmt.Errorf("which app? %s --app <app>", c.CommandPath())
 		}
 		c.app = app
-		return run(c, ctx)
+		return run(c)
 	})
 }
 
-func ciCmd(home cloud.Cloud, cobraCmd *cobra.Command, run func(command, context.Context) error) *cobra.Command {
-	return appCmd(home, cobraCmd, func(c command, ctx context.Context) error {
+func ciCmd(home cloud.Cloud, cobraCmd *cobra.Command, run func(command) error) *cobra.Command {
+	return appCmd(home, cobraCmd, func(c command) error {
 		cfg, err := kubeconfig.REST(kubeconfig.Path(), c.region.Context())
 		if err != nil {
 			return c.signInError(err)
@@ -65,29 +64,29 @@ func ciCmd(home cloud.Cloud, cobraCmd *cobra.Command, run func(command, context.
 		if err != nil {
 			return fmt.Errorf("your %s context is damaged; sign in again with ccloud clusters auth --region %s: %w", c.region.Context(), c.region.Name, err)
 		}
-		return run(c, ctx)
+		return run(c)
 	})
 }
 
-func runCmd(home cloud.Cloud, cobraCmd *cobra.Command, run func(command, context.Context, workflows.Run) error) *cobra.Command {
+func runCmd(home cloud.Cloud, cobraCmd *cobra.Command, run func(command, workflows.Run) error) *cobra.Command {
 	cobraCmd.Args = func(c *cobra.Command, args []string) error {
 		if len(args) != 1 {
 			return fmt.Errorf("which run? %s <run>, where <run> is an ID from ccloud workflow list", c.CommandPath())
 		}
 		return nil
 	}
-	return ciCmd(home, cobraCmd, func(c command, ctx context.Context) error {
-		r, err := c.getRun(ctx)
+	return ciCmd(home, cobraCmd, func(c command) error {
+		r, err := c.getRun()
 		if err != nil {
 			return err
 		}
-		return run(c, ctx, r)
+		return run(c, r)
 	})
 }
 
-func (c command) getRun(ctx context.Context) (workflows.Run, error) {
+func (c command) getRun() (workflows.Run, error) {
 	name := c.Flags().Arg(0)
-	r, err := c.runs.Get(ctx, name)
+	r, err := c.runs.Get(c.Context(), name)
 	if apierrors.IsNotFound(err) {
 		err = fmt.Errorf("%s has no run %s in %s; see ccloud workflow list -a %s -r %s", c.app, name, c.region.Name, c.app, c.region.Name)
 	}

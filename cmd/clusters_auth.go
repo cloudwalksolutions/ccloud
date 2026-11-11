@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,7 +12,7 @@ import (
 	"github.com/cloudwalksolutions/ccloud/internal/kubeconfig"
 )
 
-func (c command) auth(ctx context.Context) error {
+func (c command) auth() error {
 	if c.home.ClientID == "" {
 		return fmt.Errorf("this ccloud was built without an OIDC client for the %s cloud; install a release build", c.home.Name)
 	}
@@ -30,7 +29,7 @@ func (c command) auth(ctx context.Context) error {
 	}
 
 	var reason bytes.Buffer
-	whoami := exec.CommandContext(ctx, "kubectl", "--kubeconfig", trial, "auth", "whoami")
+	whoami := exec.CommandContext(c.Context(), "kubectl", "--kubeconfig", trial, "auth", "whoami")
 	whoami.Stdout, whoami.Stderr = c.OutOrStdout(), &reason
 	if err := whoami.Run(); err != nil {
 		return fmt.Errorf("signing in to %s failed, so your kubeconfig is unchanged: %s", c.region.Name, strings.TrimSpace(reason.String()))
@@ -41,7 +40,7 @@ func (c command) auth(ctx context.Context) error {
 	return c.switched()
 }
 
-func (c command) setContext(_ context.Context) error {
+func (c command) setContext() error {
 	namespace, _ := c.Flags().GetString("namespace")
 	if err := kubeconfig.Use(kubeconfig.Path(), c.region.Context(), namespace); err != nil {
 		return c.signInError(err)

@@ -15,17 +15,17 @@ import (
 	clientauthentication "k8s.io/client-go/pkg/apis/clientauthentication/v1"
 )
 
-func (c command) credentials(ctx context.Context) error {
+func (c command) credentials() error {
 	info := clientauthentication.ExecCredential{Spec: clientauthentication.ExecCredentialSpec{Cluster: &clientauthentication.Cluster{}}}
 	_ = json.Unmarshal([]byte(os.Getenv("KUBERNETES_EXEC_INFO")), &info)
 	proxy, err := url.Parse(info.Spec.Cluster.ProxyURL)
 	if err != nil || proxy.Host == "" {
 		return errors.New("kubectl runs this for a ccloud context; sign in with ccloud clusters auth")
 	}
-	if err := c.tunnel(ctx, proxy.Host); err != nil {
+	if err := c.tunnel(proxy.Host); err != nil {
 		return err
 	}
-	token := exec.CommandContext(ctx, "kubectl-oidc_login", c.oidcArgs()...)
+	token := exec.CommandContext(c.Context(), "kubectl-oidc_login", c.oidcArgs()...)
 	token.Stdin, token.Stdout, token.Stderr = c.InOrStdin(), c.OutOrStdout(), c.ErrOrStderr()
 	return token.Run()
 }
@@ -41,7 +41,7 @@ func (c command) oidcArgs() []string {
 	return args
 }
 
-func (c command) tunnel(ctx context.Context, address string) error {
+func (c command) tunnel(address string) error {
 	if listening(address) {
 		return nil
 	}
@@ -53,7 +53,7 @@ func (c command) tunnel(ctx context.Context, address string) error {
 	exited := make(chan error, 1)
 	go func() { exited <- cloudflared.Wait() }()
 
-	ctx, stop := context.WithTimeout(ctx, 20*time.Second)
+	ctx, stop := context.WithTimeout(c.Context(), 20*time.Second)
 	defer stop()
 	for {
 		select {

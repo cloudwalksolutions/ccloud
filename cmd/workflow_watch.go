@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -10,7 +9,7 @@ import (
 
 const clearScreen = "\x1b[H\x1b[2J"
 
-func (c command) watch(ctx context.Context, run workflows.Run) error {
+func (c command) watch(run workflows.Run) error {
 	interval, _ := c.Flags().GetDuration("interval")
 	out := c.OutOrStdout()
 	redraw := terminal(out)
@@ -22,11 +21,11 @@ func (c command) watch(ctx context.Context, run workflows.Run) error {
 			fmt.Fprintf(out, "\nLooking again every %s; Ctrl-C stops watching, not the run.\n", interval)
 		}
 		select {
-		case <-ctx.Done():
+		case <-c.Context().Done():
 			return nil
 		case <-time.After(interval):
 		}
-		run, err = c.getRun(ctx)
+		run, err = c.getRun()
 	}
 	if err != nil {
 		return err

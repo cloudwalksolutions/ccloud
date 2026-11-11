@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -12,16 +11,16 @@ import (
 	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
-func (c command) stepLogs(ctx context.Context, run workflows.Run) error {
+func (c command) stepLogs(run workflows.Run) error {
 	kept := &logReader{command: c}
 	onlyFailed, _ := c.Flags().GetBool("failed")
 	for _, step := range run.Steps() {
 		if step.StartedAt.IsZero() || (onlyFailed && !failed(step.Phase)) {
 			continue
 		}
-		text, err := c.runs.StepLog(ctx, run, step)
+		text, err := c.runs.StepLog(c.Context(), run, step)
 		if apierrors.IsNotFound(err) {
-			text, err = kept.stepLog(ctx, run, step)
+			text, err = kept.stepLog(run, step)
 		}
 		if err != nil {
 			return err
@@ -37,8 +36,8 @@ func failed(phase string) bool {
 	return phase == "Failed" || phase == "Error"
 }
 
-func (r *logReader) stepLog(ctx context.Context, run workflows.Run, step workflows.Step) (string, error) {
-	entries, err := r.read(ctx, url.Values{
+func (r *logReader) stepLog(run workflows.Run, step workflows.Step) (string, error) {
+	entries, err := r.read(url.Values{
 		"namespace": {r.ci()},
 		"pod":       {run.PodName(step)},
 		"container": {"main"},

@@ -40,7 +40,8 @@ func logsCmd(home cloud.Cloud) *cobra.Command {
 	return logsCommand
 }
 
-func (c command) readLogs(ctx context.Context) error {
+func (c command) readLogs() error {
+	ctx := c.Context()
 	env, _ := c.Flags().GetString("env")
 	if env == "" {
 		return fmt.Errorf("which environment? ccloud logs --env <env>, such as prod, stage, ci or a feature environment's name")
@@ -52,7 +53,7 @@ func (c command) readLogs(ctx context.Context) error {
 	format, _ := c.Flags().GetString("output")
 	printer := logPrinter{out: c.OutOrStdout(), format: format, colour: paletteFor(c.OutOrStdout())}
 	for {
-		entries, err := gateway.read(ctx, query)
+		entries, err := gateway.read(query)
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -102,27 +103,27 @@ type logReader struct {
 	gateway *logs.Gateway
 }
 
-func (r *logReader) read(ctx context.Context, query url.Values) ([]logs.Entry, error) {
+func (r *logReader) read(query url.Values) ([]logs.Entry, error) {
 	if r.gateway == nil {
-		gateway, err := r.signInToLogs(ctx)
+		gateway, err := r.signInToLogs()
 		if err != nil {
 			return nil, err
 		}
 		r.gateway = &gateway
 	}
-	return r.gateway.Read(ctx, query)
+	return r.gateway.Read(r.Context(), query)
 }
 
-func (c command) signInToLogs(ctx context.Context) (logs.Gateway, error) {
+func (c command) signInToLogs() (logs.Gateway, error) {
 	address, err := url.Parse(c.region.Logs)
 	if err != nil {
 		return logs.Gateway{}, fmt.Errorf("%s's logs gateway %q is not a URL: %w", c.region.Name, c.region.Logs, err)
 	}
-	access, err := c.accessToken(ctx)
+	access, err := c.accessToken()
 	if err != nil {
 		return logs.Gateway{}, err
 	}
-	oidc := exec.CommandContext(ctx, "kubectl-oidc_login", c.oidcArgs()...)
+	oidc := exec.CommandContext(c.Context(), "kubectl-oidc_login", c.oidcArgs()...)
 	oidc.Stderr = c.ErrOrStderr()
 	credential, err := oidc.Output()
 	var exchanged clientauthentication.ExecCredential
@@ -132,16 +133,16 @@ func (c command) signInToLogs(ctx context.Context) (logs.Gateway, error) {
 	return logs.Gateway{URL: address, AccessToken: access, IDToken: exchanged.Status.Token}, nil
 }
 
-func (c command) accessToken(ctx context.Context) (string, error) {
-	token, err := exec.CommandContext(ctx, "cloudflared", "access", "token", "--app="+c.region.Logs).Output()
+func (c command) accessToken() (string, error) {
+	token, err := exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+c.region.Logs).Output()
 	if err == nil {
 		return strings.TrimSpace(string(token)), nil
 	}
-	login := exec.CommandContext(ctx, "cloudflared", "access", "login", c.region.Logs)
+	login := exec.CommandContext(c.Context(), "cloudflared", "access", "login", c.region.Logs)
 	login.Stdout, login.Stderr = c.ErrOrStderr(), c.ErrOrStderr()
 	if err := login.Run(); err != nil {
 		return "", fmt.Errorf("signing in to %s through Cloudflare Access: %w", c.region.Logs, err)
 	}
-	token, err = exec.CommandContext(ctx, "cloudflared", "access", "token", "--app="+c.region.Logs).Output()
+	token, err = exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+c.region.Logs).Output()
 	return strings.TrimSpace(string(token)), err
 }

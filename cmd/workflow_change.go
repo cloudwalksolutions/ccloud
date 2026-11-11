@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -9,19 +8,19 @@ import (
 	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
-func (c command) cancel(ctx context.Context, run workflows.Run) error {
+func (c command) cancel(run workflows.Run) error {
 	if !run.Status.FinishedAt.IsZero() {
 		return fmt.Errorf("%s already finished: %s", run.Name(), run.Status.Phase)
 	}
-	if err := c.runs.Cancel(ctx, run.Name()); err != nil {
+	if err := c.runs.Cancel(c.Context(), run.Name()); err != nil {
 		return c.mayNotChange(err)
 	}
 	_, err := fmt.Fprintf(c.OutOrStdout(), "Cancelling %s. Follow it with: ccloud workflow watch %s -a %s -r %s\n", run.Name(), run.Name(), c.app, c.region.Name)
 	return err
 }
 
-func (c command) rerun(ctx context.Context, run workflows.Run) error {
-	started, err := c.runs.Rerun(ctx, run)
+func (c command) rerun(run workflows.Run) error {
+	started, err := c.runs.Rerun(c.Context(), run)
 	if err != nil {
 		return c.mayNotChange(err)
 	}

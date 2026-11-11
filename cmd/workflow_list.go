@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"text/tabwriter"
 	"time"
@@ -10,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func (c command) list(ctx context.Context) error {
+func (c command) list() error {
 	selector := labels.Set{}
 	for _, flag := range []string{"flow", "pr"} {
 		if value, _ := c.Flags().GetString(flag); value != "" {
@@ -18,7 +17,7 @@ func (c command) list(ctx context.Context) error {
 		}
 	}
 	limit, _ := c.Flags().GetInt("limit")
-	runs, err := c.runs.List(ctx, selector.String())
+	runs, err := c.runs.List(c.Context(), selector.String())
 	if apierrors.IsForbidden(err) {
 		err = fmt.Errorf("you may not read %s's runs in %s (%s)", c.app, c.region.Name, c.ci())
 	}

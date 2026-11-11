@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -10,7 +9,7 @@ import (
 	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
-func (c command) view(_ context.Context, run workflows.Run) error {
+func (c command) view(run workflows.Run) error {
 	render(c.OutOrStdout(), run, time.Now())
 	if failed(run.Status.Phase) {
 		fmt.Fprintf(c.OutOrStdout(), "\nTo see what failed, try: ccloud workflow logs %s -a %s -r %s --failed\n", run.Name(), c.app, c.region.Name)
