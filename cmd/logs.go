@@ -127,7 +127,7 @@ func signInToLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region) (logs
 	if err != nil {
 		return logs.Gateway{}, err
 	}
-	oidc := exec.Command("kubectl-oidc_login", oidcArgs(home)...)
+	oidc := exec.CommandContext(c.Context(), "kubectl-oidc_login", oidcArgs(home)...)
 	oidc.Stderr = c.ErrOrStderr()
 	credential, err := oidc.Output()
 	var exchanged clientauthentication.ExecCredential
@@ -138,15 +138,15 @@ func signInToLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region) (logs
 }
 
 func accessToken(c *cobra.Command, region cloud.Region) (string, error) {
-	token, err := exec.Command("cloudflared", "access", "token", "--app="+region.Logs).Output()
+	token, err := exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+region.Logs).Output()
 	if err == nil {
 		return strings.TrimSpace(string(token)), nil
 	}
-	login := exec.Command("cloudflared", "access", "login", region.Logs)
+	login := exec.CommandContext(c.Context(), "cloudflared", "access", "login", region.Logs)
 	login.Stdout, login.Stderr = c.ErrOrStderr(), c.ErrOrStderr()
 	if err := login.Run(); err != nil {
 		return "", fmt.Errorf("signing in to %s through Cloudflare Access: %w", region.Logs, err)
 	}
-	token, err = exec.Command("cloudflared", "access", "token", "--app="+region.Logs).Output()
+	token, err = exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+region.Logs).Output()
 	return strings.TrimSpace(string(token)), err
 }

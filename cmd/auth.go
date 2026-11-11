@@ -23,7 +23,7 @@ func auth(c *cobra.Command, home cloud.Cloud, region cloud.Region) error {
 	}
 
 	var reason bytes.Buffer
-	whoami := exec.Command("kubectl", "--kubeconfig", trial, "auth", "whoami")
+	whoami := exec.CommandContext(c.Context(), "kubectl", "--kubeconfig", trial, "auth", "whoami")
 	whoami.Stdout, whoami.Stderr = c.OutOrStdout(), &reason
 	if err := whoami.Run(); err != nil {
 		return fmt.Errorf("signing in to %s failed, so your kubeconfig is unchanged: %s", region.Name, strings.TrimSpace(reason.String()))
