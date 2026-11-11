@@ -54,6 +54,8 @@ X unit in 1m18s
   exit code 1
 * e2e
 - deploy-preview
+
+To see what failed, try: ccloud workflow logs api-tests-x7k2p -a shop -r north1 --failed
 `))
 	})
 
