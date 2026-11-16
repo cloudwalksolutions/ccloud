@@ -44,3 +44,18 @@ pressure on the nodes they run on. Raw numbers; the client decides what to flag.
 CPU is in cores and memory in bytes. `request` and `limit` are absent when unset, `throttled` (the
 share of CPU periods held back) when there is no CPU limit. `restarts` and `oomKills` count the last
 24 hours. `cpuWait` and `memoryStall` are the share of time the node's tasks waited.
+
+## `GET /v1/apps/{app}/network`
+
+Query: `env` (required), `since` (a Go duration, default `1h`). One environment's traffic over that
+window. 400 without `env`; 404 when this region hosts no such environment the caller may read.
+
+```json
+{"ingress": {"requestsPerSecond": 3.2, "serverErrors": 0.005, "p95Seconds": 0.21},
+ "egress": [{"destination": "hydro.nationalmap.gov", "port": 443, "connections": 412, "unanswered": 398, "reset": 3}],
+ "drops": [{"destination": "10.0.4.9", "port": 5432, "reason": "POLICY_DENIED", "count": 12}]}
+```
+
+`serverErrors` is the share of requests answered 5xx. `egress` lists internet destinations by DNS
+name where the cloud saw the lookup, else by IP: `connections` opened, `unanswered` of them with no
+SYN-ACK back, and `reset` by the far end. `drops` are connections the network refused.

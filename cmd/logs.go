@@ -45,7 +45,7 @@ func logsCmd(home cloud.Cloud) *cobra.Command {
 func namedEnv(c *cobra.Command) (string, error) {
 	env, _ := c.Flags().GetString("env")
 	if env == "" {
-		return "", fmt.Errorf("which environment? ccloud logs --env <env>, such as prod, stage, ci or a feature environment's name")
+		return "", fmt.Errorf("which environment? %s --env <env>, such as prod, stage, ci or a feature environment's name", c.CommandPath())
 	}
 	return env, nil
 }
