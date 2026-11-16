@@ -8,7 +8,9 @@ Guidance for coding agents (Claude Code, pi, Gemini CLI) when working in ccloud.
 ccloud is the developer CLI for apps running in CloudWalk Cloud, or anyone's Custom Cloud.
 `clusters` signs a developer in to a region's Kubernetes API through Cloudflare Access and an OIDC
 provider; `workflow` reads their app's CI runs through that cluster; `logs` reads their app's logs
-through the region's logs gateway. What comes next is in `specs/`.
+through the region's gateway, whose contract is [docs/gateway.md](docs/gateway.md). Inside an app
+repo, the cloud's repo directory (`.ccloud` unless the cloud says otherwise) names the app. What
+comes next is in `specs/`.
 
 ## Development Philosophy
 

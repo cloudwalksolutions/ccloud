@@ -119,9 +119,9 @@ func (r *logReader) read(query url.Values) ([]logs.Entry, error) {
 }
 
 func signInToLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region) (logs.Gateway, error) {
-	address, err := url.Parse(region.Logs)
+	address, err := url.Parse(region.Gateway)
 	if err != nil {
-		return logs.Gateway{}, fmt.Errorf("%s's logs gateway %q is not a URL: %w", region.Name, region.Logs, err)
+		return logs.Gateway{}, fmt.Errorf("%s's gateway %q is not a URL: %w", region.Name, region.Gateway, err)
 	}
 	access, err := accessToken(c, region)
 	if err != nil {
@@ -138,15 +138,15 @@ func signInToLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region) (logs
 }
 
 func accessToken(c *cobra.Command, region cloud.Region) (string, error) {
-	token, err := exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+region.Logs).Output()
+	token, err := exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+region.Gateway).Output()
 	if err == nil {
 		return strings.TrimSpace(string(token)), nil
 	}
-	login := exec.CommandContext(c.Context(), "cloudflared", "access", "login", "--quiet", region.Logs)
+	login := exec.CommandContext(c.Context(), "cloudflared", "access", "login", "--quiet", region.Gateway)
 	login.Stdout, login.Stderr = c.ErrOrStderr(), c.ErrOrStderr()
 	if err := login.Run(); err != nil {
-		return "", fmt.Errorf("signing in to %s through Cloudflare Access: %w", region.Logs, err)
+		return "", fmt.Errorf("signing in to %s through Cloudflare Access: %w", region.Gateway, err)
 	}
-	token, err = exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+region.Logs).Output()
+	token, err = exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+region.Gateway).Output()
 	return strings.TrimSpace(string(token)), err
 }

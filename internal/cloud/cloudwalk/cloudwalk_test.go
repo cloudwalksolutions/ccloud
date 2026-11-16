@@ -30,9 +30,13 @@ var _ = Describe("the cloudwalk cloud", func() {
 		}
 	})
 
-	It("reads each region's logs through that region's own gateway, over HTTPS", func() {
+	It("asks each region's own dev gateway, over HTTPS", func() {
 		for _, region := range cloudwalk.Cloud().Regions {
-			Expect(region.Logs).To(Equal("https://logs."+region.Name+".cloudwalksolutions.net"), region.Name)
+			Expect(region.Gateway).To(Equal("https://api."+region.Name+".cloudwalksolutions.net"), region.Name)
 		}
+	})
+
+	It("finds an app repo's file under .cloudwalk, beside its workflows", func() {
+		Expect(cloudwalk.Cloud().AppDir()).To(Equal(".cloudwalk"))
 	})
 })

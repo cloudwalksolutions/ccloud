@@ -13,6 +13,14 @@ type Cloud struct {
 	Scopes       []string
 	APIServer    string
 	Regions      []Region
+	RepoDir      string
+}
+
+func (c Cloud) AppDir() string {
+	if c.RepoDir != "" {
+		return c.RepoDir
+	}
+	return ".ccloud"
 }
 
 type Region struct {
@@ -20,7 +28,7 @@ type Region struct {
 	Host      string
 	Port      int
 	Authority []byte
-	Logs      string
+	Gateway   string
 }
 
 func (r Region) Context() string { return "ccloud-" + r.Name }
