@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 	"github.com/cloudwalksolutions/ccloud/internal/kubeconfig"
+	"github.com/cloudwalksolutions/ccloud/internal/repo"
 	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
@@ -108,9 +110,18 @@ func appCmd(home cloud.Cloud, command *cobra.Command, run func(*cobra.Command, c
 	var app string
 	command.Flags().StringVarP(&app, "app", "a", "", "the app, as it is named in its namespaces")
 	return regionCmd(home, command, func(c *cobra.Command, region cloud.Region) error {
-		if app == "" {
+		named := app
+		if named == "" {
+			wd, _ := os.Getwd()
+			found, err := repo.App(wd, home.AppDir())
+			if err != nil {
+				return err
+			}
+			named = found
+		}
+		if named == "" {
 			return fmt.Errorf("which app? %s --app <app>", c.CommandPath())
 		}
-		return run(c, region, app)
+		return run(c, region, named)
 	})
 }

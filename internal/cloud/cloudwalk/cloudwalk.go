@@ -30,9 +30,10 @@ func Cloud() cloud.Cloud {
 			region("us-central1", "k8s.us-central1.cloudwalksolutions.net", 16444, usCentral1),
 			region("us-east1", "k8s.us-east1.cloudwalksolutions.net", 16443, usEast1),
 		},
+		RepoDir: ".cloudwalk",
 	}
 }
 
 func region(name, host string, port int, authority []byte) cloud.Region {
-	return cloud.Region{Name: name, Host: host, Port: port, Authority: authority, Logs: "https://logs." + name + ".cloudwalksolutions.net"}
+	return cloud.Region{Name: name, Host: host, Port: port, Authority: authority, Gateway: "https://api." + name + ".cloudwalksolutions.net"}
 }

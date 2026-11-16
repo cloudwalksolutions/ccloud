@@ -61,7 +61,7 @@ var _ = Describe("ccloud logs", func() {
 		DeferCleanup(server.Close)
 		home = example
 		home.Regions = append([]cloud.Region{}, example.Regions...)
-		home.Regions[0].Logs = server.URL
+		home.Regions[0].Gateway = server.URL
 
 		bin := GinkgoT().TempDir()
 		GinkgoT().Setenv("PATH", bin)
@@ -171,17 +171,17 @@ esac`)
 		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1")).To(Succeed())
 
 		Expect(out.String()).NotTo(ContainSubstring("access-jwt"))
-		Expect(os.ReadFile(session)).To(Equal([]byte(home.Regions[0].Logs + "\n")))
+		Expect(os.ReadFile(session)).To(Equal([]byte(home.Regions[0].Gateway + "\n")))
 		Expect(gateway.asked).To(HaveLen(1))
 		Expect(gateway.asked[0].Header.Get("cf-access-token")).To(Equal("access-jwt"))
 	})
 
-	It("names a logs address in the cloud's definition that is not a URL", func() {
-		home.Regions[0].Logs = "https://logs north1"
+	It("names a gateway address in the cloud's definition that is not a URL", func() {
+		home.Regions[0].Gateway = "https://api north1"
 
 		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
 
-		Expect(err).To(MatchError(HavePrefix(`north1's logs gateway "https://logs north1" is not a URL: `)))
+		Expect(err).To(MatchError(HavePrefix(`north1's gateway "https://api north1" is not a URL: `)))
 	})
 
 	It("says so when something other than the gateway answers, such as Access's login page", func() {
@@ -211,7 +211,7 @@ esac`)
 
 		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
 
-		Expect(err).To(MatchError(HavePrefix("signing in to " + home.Regions[0].Logs + " through Cloudflare Access")))
+		Expect(err).To(MatchError(HavePrefix("signing in to " + home.Regions[0].Gateway + " through Cloudflare Access")))
 		Expect(out.String()).To(ContainSubstring("Unable to reach the login page"))
 		Expect(gateway.asked).To(BeEmpty())
 	})

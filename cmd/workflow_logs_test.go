@@ -40,7 +40,7 @@ var _ = Describe("ccloud workflow logs", func() {
 		DeferCleanup(server.Close)
 		home = example
 		home.Regions = append([]cloud.Region{}, example.Regions...)
-		home.Regions[0].Logs = server.URL
+		home.Regions[0].Gateway = server.URL
 		bin := GinkgoT().TempDir()
 		GinkgoT().Setenv("PATH", bin)
 		for name, script := range map[string]string{
