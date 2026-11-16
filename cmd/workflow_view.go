@@ -21,8 +21,8 @@ func workflowView(c *cobra.Command, region cloud.Region, app string, _ workflows
 }
 
 func render(out io.Writer, run workflows.Run, now time.Time) {
-	colour := paletteFor(out)
-	title := []string{colour.status(run.Status.Phase) + " " + run.Flow()}
+	color := paletteFor(out)
+	title := []string{color.status(run.Status.Phase) + " " + run.Flow()}
 	if run.PR() != "" {
 		title = append(title, "#"+run.PR())
 	}
@@ -41,7 +41,7 @@ func render(out io.Writer, run workflows.Run, now time.Time) {
 		if i == 0 {
 			fmt.Fprintln(out)
 		}
-		line := colour.status(step.Phase) + " " + step.DisplayName
+		line := color.status(step.Phase) + " " + step.DisplayName
 		if step.Took() > 0 {
 			line += " in " + step.Took().Round(time.Second).String()
 		}

@@ -2,6 +2,7 @@ package cmd_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"fmt"
 	"net/http"
@@ -19,14 +20,20 @@ import (
 )
 
 type fakeGateway struct {
-	asked   []*http.Request
-	answers []string
-	refuse  int
-	after   func(asked int)
-	hosts   []string
+	asked     []*http.Request
+	answers   []string
+	refuse    int
+	after     func(asked int)
+	hosts     []string
+	resources string
 }
 
 func (g *fakeGateway) serve(w http.ResponseWriter, r *http.Request) {
+	if strings.HasSuffix(r.URL.Path, "/resources") && g.refuse == 0 {
+		g.asked = append(g.asked, r)
+		_, _ = w.Write([]byte(cmp.Or(g.resources, `{"environments":[]}`)))
+		return
+	}
 	if app, ok := strings.CutPrefix(r.URL.Path, "/v1/apps/"); ok && g.refuse == 0 {
 		environments := []string{}
 		for _, env := range g.hosts {
@@ -97,7 +104,7 @@ var _ = Describe("ccloud logs", func() {
 		Expect(lines(out)[1]).To(HaveSuffix(" web-5d2a POST /checkout 500"))
 	})
 
-	It("colours a level by how bad it is, when asked to, as on a terminal", func() {
+	It("colors a level by how bad it is, when asked to, as on a terminal", func() {
 		GinkgoT().Setenv("CLICOLOR_FORCE", "1")
 		gateway.answers = []string{`{"entries":[
 			{"time":"2026-10-26T07:33:21Z","pod":"api","line":"{\"level\":\"error\",\"msg\":\"a\"}"},
