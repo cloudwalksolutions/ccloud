@@ -26,12 +26,18 @@ type fakeGateway struct {
 	after     func(asked int)
 	hosts     []string
 	resources string
+	network   string
 }
 
 func (g *fakeGateway) serve(w http.ResponseWriter, r *http.Request) {
 	if strings.HasSuffix(r.URL.Path, "/resources") && g.refuse == 0 {
 		g.asked = append(g.asked, r)
 		_, _ = w.Write([]byte(cmp.Or(g.resources, `{"environments":[]}`)))
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/network") && g.refuse == 0 {
+		g.asked = append(g.asked, r)
+		_, _ = w.Write([]byte(g.network))
 		return
 	}
 	if app, ok := strings.CutPrefix(r.URL.Path, "/v1/apps/"); ok && g.refuse == 0 {

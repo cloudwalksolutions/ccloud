@@ -83,6 +83,18 @@ time or more, at 90% of its memory limit, OOMKilled or restarted 3 times in 24 h
 memory limit at all. A node under pressure is named apart, since that is the node, not the
 container's limits.
 
+## Net
+
+```sh
+ccloud net -e prod
+ccloud net -e ci --since 24h
+```
+
+One environment's traffic over `--since` (an hour unless asked): its requests per second, share
+of 5xx and p95; every internet host it connected to, by name where the cloud saw the lookup, with
+how many connections got no answer or were reset; and every connection the network refused. A host
+that leaves 10% or more unanswered, or resets any, is flagged.
+
 ## Your cloud
 
 A build of ccloud serves one cloud. Its regions, their Access hostnames, gateways and pinned CAs,

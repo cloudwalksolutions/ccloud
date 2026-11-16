@@ -22,7 +22,7 @@ func RunContext(ctx context.Context, args []string, stdout, stderr io.Writer, ho
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.AddCommand(clustersCmd(home), workflowCmd(home), logsCmd(home), topCmd(home))
+	root.AddCommand(clustersCmd(home), workflowCmd(home), logsCmd(home), topCmd(home), netCmd(home))
 	root.SetArgs(args)
 	root.SetOut(stdout)
 	root.SetErr(stderr)
