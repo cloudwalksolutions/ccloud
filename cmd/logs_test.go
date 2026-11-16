@@ -3,10 +3,12 @@ package cmd_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -21,9 +23,18 @@ type fakeGateway struct {
 	answers []string
 	refuse  int
 	after   func(asked int)
+	hosts   []string
 }
 
 func (g *fakeGateway) serve(w http.ResponseWriter, r *http.Request) {
+	if app, ok := strings.CutPrefix(r.URL.Path, "/v1/apps/"); ok && g.refuse == 0 {
+		environments := []string{}
+		for _, env := range g.hosts {
+			environments = append(environments, fmt.Sprintf(`{"name":%q,"namespace":"%s-%s"}`, env, env, app))
+		}
+		_, _ = fmt.Fprintf(w, `{"environments":[%s]}`, strings.Join(environments, ","))
+		return
+	}
 	g.asked = append(g.asked, r)
 	if g.after != nil {
 		defer g.after(len(g.asked))
@@ -189,7 +200,7 @@ esac`)
 
 		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
 
-		Expect(err).To(MatchError(HavePrefix("the logs gateway answered something other than logs")))
+		Expect(err).To(MatchError(HavePrefix("the gateway answered something other than logs")))
 	})
 
 	It("stops waiting for your Access sign-in when you press Ctrl-C", func(ctx SpecContext) {
@@ -221,7 +232,7 @@ esac`)
 
 		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
 
-		Expect(err).To(MatchError("the logs gateway answered 502 Bad Gateway: dev@example.test may not read logs in prod-shop"))
+		Expect(err).To(MatchError("the gateway answered 502 Bad Gateway: dev@example.test may not read logs in prod-shop"))
 	})
 
 	It("shows why the cloud's issuer would not sign you in, and asks the gateway nothing", func() {

@@ -31,17 +31,20 @@ An app repo names its app in `.ccloud/app.yaml` (CloudWalk's repos use `.cloudwa
 app: shop
 ```
 
-Anywhere inside the repo, `--app` defaults to it.
+Anywhere inside the repo, `--app` defaults to it, and the region is found for you: ccloud asks each
+region's gateway which of the app's environments it hosts, and uses the one hosting `ci` for
+workflows and the `-e` environment for logs. `clusters auth` with no `--region` signs in to every
+region hosting the app. `-a` and `-r` still win when given.
 
 ## Workflows
 
 ```sh
-ccloud workflow list -a <app> -r us-east1 --pr 105
-ccloud workflow view api-tests-x7k2p -a <app> -r us-east1
-ccloud workflow watch api-tests-x7k2p -a <app> -r us-east1 --exit-status
-ccloud workflow logs api-tests-x7k2p -a <app> -r us-east1 --failed
-ccloud workflow rerun api-tests-x7k2p -a <app> -r us-east1
-ccloud workflow cancel build-images-q9w1z -a <app> -r us-east1
+ccloud workflow list --pr 105
+ccloud workflow view api-tests-x7k2p
+ccloud workflow watch api-tests-x7k2p --exit-status
+ccloud workflow logs api-tests-x7k2p --failed
+ccloud workflow rerun api-tests-x7k2p
+ccloud workflow cancel build-images-q9w1z
 ```
 
 Your app's CI runs, read through the cluster you signed in to with `clusters auth`. `list` shows
@@ -55,8 +58,8 @@ going, and its exit handlers still report.
 ## Logs
 
 ```sh
-ccloud logs -a <app> -e prod -r us-central1 -l error --since 6h
-ccloud logs -a <app> -e stage -r us-central1 -f -g checkout
+ccloud logs -e prod -l error --since 6h
+ccloud logs -e stage -f -g checkout
 ```
 
 An app's logs in one environment (`prod`, `stage`, `ci`, or a feature environment's name), kept

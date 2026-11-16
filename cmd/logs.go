@@ -16,15 +16,15 @@ import (
 	clientauthentication "k8s.io/client-go/pkg/apis/clientauthentication/v1"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
-	"github.com/cloudwalksolutions/ccloud/internal/logs"
+	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
 
 func logsCmd(home cloud.Cloud) *cobra.Command {
 	command := appCmd(home, &cobra.Command{
-		Use:     "logs --app <app> --env <env> --region <region>",
+		Use:     "logs --env <env> [--app <app>]",
 		Short:   "Read an app's logs in one environment, as far back as they are kept",
-		Example: "  ccloud logs -a <app> -e prod -r " + home.Regions[0].Name + " --level error --since 6h",
-	}, func(c *cobra.Command, region cloud.Region, app string) error {
+		Example: "  ccloud logs -e prod --level error --since 6h",
+	}, namedEnv, func(c *cobra.Command, region cloud.Region, app string) error {
 		return readLogs(c, home, region, app)
 	})
 	flags := command.Flags()
@@ -42,12 +42,17 @@ func logsCmd(home cloud.Cloud) *cobra.Command {
 	return command
 }
 
-func readLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app string) error {
+func namedEnv(c *cobra.Command) (string, error) {
 	env, _ := c.Flags().GetString("env")
 	if env == "" {
-		return fmt.Errorf("which environment? ccloud logs --env <env>, such as prod, stage, ci or a feature environment's name")
+		return "", fmt.Errorf("which environment? ccloud logs --env <env>, such as prod, stage, ci or a feature environment's name")
 	}
-	gateway := &logReader{c: c, home: home, region: region}
+	return env, nil
+}
+
+func readLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app string) error {
+	env, _ := c.Flags().GetString("env")
+	reader := &logReader{c: c, home: home, region: region}
 	query := logsQuery(c, env+"-"+app)
 	follow, _ := c.Flags().GetBool("follow")
 	interval, _ := c.Flags().GetDuration("interval")
@@ -55,11 +60,11 @@ func readLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 	printer := logPrinter{out: c.OutOrStdout(), format: format, colour: paletteFor(c.OutOrStdout())}
 	ctx := c.Context()
 	for {
-		entries, err := gateway.read(query)
+		entries, err := reader.read(query)
 		if ctx.Err() != nil {
 			return nil
 		}
-		var refused logs.Refused
+		var refused gateway.Refused
 		if errors.As(err, &refused) && refused.Status == http.StatusForbidden {
 			err = fmt.Errorf("you may not read %s's %s logs in %s: %s", app, env, region.Name, refused.Reason)
 		}
@@ -101,40 +106,40 @@ func logsQuery(c *cobra.Command, namespace string) url.Values {
 }
 
 type logReader struct {
-	c       *cobra.Command
-	home    cloud.Cloud
-	region  cloud.Region
-	gateway *logs.Gateway
+	c        *cobra.Command
+	home     cloud.Cloud
+	region   cloud.Region
+	signedIn *gateway.Gateway
 }
 
-func (r *logReader) read(query url.Values) ([]logs.Entry, error) {
-	if r.gateway == nil {
-		gateway, err := signInToLogs(r.c, r.home, r.region)
+func (r *logReader) read(query url.Values) ([]gateway.Entry, error) {
+	if r.signedIn == nil {
+		g, err := signInToGateway(r.c, r.home, r.region)
 		if err != nil {
 			return nil, err
 		}
-		r.gateway = &gateway
+		r.signedIn = &g
 	}
-	return r.gateway.Read(r.c.Context(), query)
+	return r.signedIn.Read(r.c.Context(), query)
 }
 
-func signInToLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region) (logs.Gateway, error) {
+func signInToGateway(c *cobra.Command, home cloud.Cloud, region cloud.Region) (gateway.Gateway, error) {
 	address, err := url.Parse(region.Gateway)
 	if err != nil {
-		return logs.Gateway{}, fmt.Errorf("%s's gateway %q is not a URL: %w", region.Name, region.Gateway, err)
+		return gateway.Gateway{}, fmt.Errorf("%s's gateway %q is not a URL: %w", region.Name, region.Gateway, err)
 	}
 	access, err := accessToken(c, region)
 	if err != nil {
-		return logs.Gateway{}, err
+		return gateway.Gateway{}, err
 	}
 	oidc := exec.CommandContext(c.Context(), "kubectl-oidc_login", oidcArgs(home)...)
 	oidc.Stderr = c.ErrOrStderr()
 	credential, err := oidc.Output()
 	var exchanged clientauthentication.ExecCredential
 	if err != nil || json.Unmarshal(credential, &exchanged) != nil || exchanged.Status == nil {
-		return logs.Gateway{}, fmt.Errorf("signing in to %s failed", home.Issuer)
+		return gateway.Gateway{}, fmt.Errorf("signing in to %s failed", home.Issuer)
 	}
-	return logs.Gateway{URL: address, AccessToken: access, IDToken: exchanged.Status.Token}, nil
+	return gateway.Gateway{URL: address, AccessToken: access, IDToken: exchanged.Status.Token}, nil
 }
 
 func accessToken(c *cobra.Command, region cloud.Region) (string, error) {

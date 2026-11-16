@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cloudwalksolutions/ccloud/internal/logs"
+	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
 
 type logPrinter struct {
@@ -17,7 +17,7 @@ type logPrinter struct {
 	colour palette
 }
 
-func (p logPrinter) print(entry logs.Entry) {
+func (p logPrinter) print(entry gateway.Entry) {
 	switch p.format {
 	case "raw":
 		fmt.Fprintln(p.out, entry.Line)

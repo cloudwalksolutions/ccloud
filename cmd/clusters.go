@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
+	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
 
 func clustersCmd(home cloud.Cloud) *cobra.Command {
@@ -16,9 +17,9 @@ func clustersCmd(home cloud.Cloud) *cobra.Command {
 		Use:   "clusters",
 		Short: "Reach a region's Kubernetes cluster as yourself",
 	}
-	clusters.AddCommand(regionCmd(home, &cobra.Command{
+	clusters.AddCommand(appRegionsCmd(home, &cobra.Command{
 		Use:     "auth --region <region>",
-		Short:   "Sign in to a region's cluster and add it to your kubeconfig as ccloud-<region>",
+		Short:   "Sign in to a region's cluster and add it to your kubeconfig as ccloud-<region>; in an app repo, every region hosting it",
 		Example: "  ccloud clusters auth --region " + first,
 	}, func(c *cobra.Command, region cloud.Region) error {
 		if home.ClientID == "" {
@@ -49,20 +50,60 @@ func clustersCmd(home cloud.Cloud) *cobra.Command {
 }
 
 func regionCmd(home cloud.Cloud, command *cobra.Command, run func(*cobra.Command, cloud.Region) error) *cobra.Command {
+	return regionsCmd(home, command, func(c *cobra.Command) ([]cloud.Region, error) {
+		return nil, whichRegion(c, home)
+	}, run)
+}
+
+func appRegionsCmd(home cloud.Cloud, command *cobra.Command, run func(*cobra.Command, cloud.Region) error) *cobra.Command {
+	return regionsCmd(home, command, func(c *cobra.Command) ([]cloud.Region, error) {
+		app, err := appNamed(home, "")
+		if err == nil && app == "" {
+			err = whichRegion(c, home)
+		}
+		var environments map[string][]gateway.Environment
+		if err == nil {
+			environments, err = everyRegionsEnvironments(c, home, app)
+		}
+		var hosting []cloud.Region
+		for _, region := range home.Regions {
+			if len(environments[region.Name]) > 0 {
+				hosting = append(hosting, region)
+			}
+		}
+		return hosting, err
+	}, run)
+}
+
+func regionsCmd(home cloud.Cloud, command *cobra.Command, unnamed func(*cobra.Command) ([]cloud.Region, error), run func(*cobra.Command, cloud.Region) error) *cobra.Command {
 	var name string
 	command.Flags().StringVarP(&name, "region", "r", "", "the "+home.Name+" region: "+strings.Join(home.Names(), ", "))
 	if command.Args == nil {
 		command.Args = cobra.NoArgs
 	}
 	command.RunE = func(c *cobra.Command, _ []string) error {
-		if name == "" {
-			return fmt.Errorf("which region? %s --region <region>, where <region> is one of %s", c.CommandPath(), strings.Join(home.Names(), ", "))
-		}
-		region, err := home.Find(name)
+		regions, err := namedOr(c, home, name, unnamed)
 		if err != nil {
 			return err
 		}
-		return run(c, region)
+		for _, region := range regions {
+			if err := run(c, region); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	return command
+}
+
+func namedOr(c *cobra.Command, home cloud.Cloud, name string, unnamed func(*cobra.Command) ([]cloud.Region, error)) ([]cloud.Region, error) {
+	if name == "" {
+		return unnamed(c)
+	}
+	region, err := home.Find(name)
+	return []cloud.Region{region}, err
+}
+
+func whichRegion(c *cobra.Command, home cloud.Cloud) error {
+	return fmt.Errorf("which region? %s --region <region>, where <region> is one of %s", c.CommandPath(), strings.Join(home.Names(), ", "))
 }
