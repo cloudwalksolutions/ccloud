@@ -30,6 +30,12 @@ var _ = Describe("ccloud clusters set-context", func() {
 		out = &bytes.Buffer{}
 	})
 
+	It("asks which region to switch to", func() {
+		err := cmd.Run([]string{"clusters", "set-context"}, out, out, example, "dev")
+
+		Expect(err).To(MatchError("which region? ccloud clusters set-context --region <region>, where <region> is one of north1, south1"))
+	})
+
 	It("sends you to sign in when the region is not in your kubeconfig yet", func() {
 		existing := write("apiVersion: v1\nkind: Config\ncurrent-context: work\ncontexts:\n- name: work\n  context: {cluster: work, user: work}\n")
 

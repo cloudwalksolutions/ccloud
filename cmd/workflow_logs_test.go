@@ -80,7 +80,7 @@ var _ = Describe("ccloud workflow logs", func() {
 
 		err := run("workflow", "logs", "api-tests-x7k2p", "-a", "shop", "-r", "north1")
 
-		Expect(err).To(MatchError("the logs gateway answered 403 Forbidden: dev@example.test may not read logs in prod-shop"))
+		Expect(err).To(MatchError("the gateway answered 403 Forbidden: dev@example.test may not read logs in prod-shop"))
 	})
 
 	It("passes over a step that never ran, which has no log anywhere", func() {
