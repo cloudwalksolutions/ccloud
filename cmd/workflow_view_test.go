@@ -59,7 +59,7 @@ To see what failed, try: ccloud workflow logs api-tests-x7k2p -a shop -r north1 
 `))
 	})
 
-	It("colours each result when asked to, as on a terminal", func() {
+	It("colors each result when asked to, as on a terminal", func() {
 		GinkgoT().Setenv("CLICOLOR_FORCE", "1")
 		started := time.Now().Add(-time.Hour)
 		ci.workflows("ci-shop", ciRun("api-tests-x7k2p", started).flow("api-tests").finished("Failed", time.Minute).

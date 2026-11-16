@@ -24,12 +24,9 @@ func appCmd(home cloud.Cloud, command *cobra.Command, env envOf, run func(*cobra
 		command.Args = cobra.NoArgs
 	}
 	command.RunE = func(c *cobra.Command, _ []string) error {
-		named, err := appNamed(home, app)
+		named, err := whichApp(c, home, app)
 		if err != nil {
 			return err
-		}
-		if named == "" {
-			return fmt.Errorf("which app? %s --app <app>", c.CommandPath())
 		}
 		environment, err := env(c)
 		if err != nil {
@@ -42,6 +39,14 @@ func appCmd(home cloud.Cloud, command *cobra.Command, env envOf, run func(*cobra
 		return run(c, found, named)
 	}
 	return command
+}
+
+func whichApp(c *cobra.Command, home cloud.Cloud, app string) (string, error) {
+	named, err := appNamed(home, app)
+	if err == nil && named == "" {
+		err = fmt.Errorf("which app? %s --app <app>", c.CommandPath())
+	}
+	return named, err
 }
 
 func appNamed(home cloud.Cloud, app string) (string, error) {

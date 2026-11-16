@@ -95,7 +95,7 @@ var _ = Describe("ccloud workflow list", func() {
 		))
 	})
 
-	It("colours each result when asked to, keeping the columns aligned", func() {
+	It("colors each result when asked to, keeping the columns aligned", func() {
 		GinkgoT().Setenv("CLICOLOR_FORCE", "1")
 		ci.workflows("ci-shop", ciRun("api-tests-x7k2p", time.Now().Add(-time.Hour)).flow("api-tests").finished("Failed", time.Minute))
 		ci.signIn("north1")

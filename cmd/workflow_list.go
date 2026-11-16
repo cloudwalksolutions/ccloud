@@ -34,16 +34,16 @@ func workflowList(c *cobra.Command, region cloud.Region, app string, ci workflow
 		return err
 	}
 	now := time.Now()
-	colour := paletteFor(c.OutOrStdout())
+	color := paletteFor(c.OutOrStdout())
 	table := tabwriter.NewWriter(c.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintln(table, colour.paint("01", "STATUS")+"\tFLOW\tPR\tBRANCH\tSHA\tID\tELAPSED\tAGE")
+	fmt.Fprintln(table, color.paint("01", "STATUS")+"\tFLOW\tPR\tBRANCH\tSHA\tID\tELAPSED\tAGE")
 	for _, run := range runs[:min(len(runs), limit)] {
 		pr := ""
 		if run.PR() != "" {
 			pr = "#" + run.PR()
 		}
 		fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			colour.status(run.Status.Phase), run.Flow(), pr, run.Branch(), short(run.SHA()), run.Name(),
+			color.status(run.Status.Phase), run.Flow(), pr, run.Branch(), short(run.SHA()), run.Name(),
 			run.Elapsed(now).Round(time.Second), age(now.Sub(run.Metadata.CreationTimestamp)))
 	}
 	return table.Flush()

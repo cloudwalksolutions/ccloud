@@ -14,7 +14,7 @@ import (
 type logPrinter struct {
 	out    io.Writer
 	format string
-	colour palette
+	color  palette
 }
 
 func (p logPrinter) print(entry gateway.Entry) {
@@ -24,7 +24,7 @@ func (p logPrinter) print(entry gateway.Entry) {
 	case "json":
 		_ = json.NewEncoder(p.out).Encode(entry)
 	default:
-		fmt.Fprintf(p.out, "%s %s %s\n", p.colour.paint("90", entry.Time.Local().Format("15:04:05")), entry.Pod, p.readable(entry.Line))
+		fmt.Fprintf(p.out, "%s %s %s\n", p.color.paint("90", entry.Time.Local().Format("15:04:05")), entry.Pod, p.readable(entry.Line))
 	}
 }
 
@@ -58,11 +58,11 @@ func (p logPrinter) readable(line string) string {
 func (p logPrinter) badge(level string) string {
 	switch level {
 	case "ERROR", "FATAL", "PANIC":
-		return p.colour.paint("31", level)
+		return p.color.paint("31", level)
 	case "WARN", "WARNING":
-		return p.colour.paint("33", level)
+		return p.color.paint("33", level)
 	default:
-		return p.colour.paint("36", level)
+		return p.color.paint("36", level)
 	}
 }
 

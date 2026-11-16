@@ -57,7 +57,7 @@ func readLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 	follow, _ := c.Flags().GetBool("follow")
 	interval, _ := c.Flags().GetDuration("interval")
 	format, _ := c.Flags().GetString("output")
-	printer := logPrinter{out: c.OutOrStdout(), format: format, colour: paletteFor(c.OutOrStdout())}
+	printer := logPrinter{out: c.OutOrStdout(), format: format, color: paletteFor(c.OutOrStdout())}
 	ctx := c.Context()
 	for {
 		entries, err := reader.read(query)

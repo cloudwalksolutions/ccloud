@@ -69,6 +69,20 @@ JSON lines print as `LEVEL message key=value`; `-o raw` gives each line as store
 entry per line. `-f` keeps reading until Ctrl-C. The first time, `cloudflared` opens your browser to
 sign in to Cloudflare Access.
 
+## Top
+
+```sh
+ccloud top
+ccloud top -e prod
+```
+
+What an app uses. With no `-e`, one row per environment in every region: pods, CPU used against
+requested, memory used against its limits, and how many containers and nodes are flagged. With
+`-e`, one row per container, its node, and why it is flagged: throttled by its CPU limit 25% of the
+time or more, at 90% of its memory limit, OOMKilled or restarted 3 times in 24 hours, or no CPU or
+memory limit at all. A node under pressure is named apart, since that is the node, not the
+container's limits.
+
 ## Your cloud
 
 A build of ccloud serves one cloud. Its regions, their Access hostnames, gateways and pinned CAs,

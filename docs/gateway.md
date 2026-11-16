@@ -27,3 +27,20 @@ The environments this region hosts for the app that the caller may read.
 
 `url` is absent when the environment serves nothing. An empty list means this region hosts none the
 caller can see.
+
+## `GET /v1/apps/{app}/resources`
+
+Query: `env` (optional, one environment). What each container of those environments uses, and the
+pressure on the nodes they run on. Raw numbers; the client decides what to flag.
+
+```json
+{"environments": [{"name": "prod", "namespace": "prod-shop",
+  "containers": [{"pod": "api-7f9c", "container": "api", "node": "node02",
+    "cpu": {"used": 0.31, "request": 0.25, "limit": 1}, "memory": {"used": 412000000, "limit": 1073741824},
+    "throttled": 0.02, "restarts": 0, "oomKills": 0}],
+  "nodes": [{"name": "node02", "cpuWait": 0.22, "memoryStall": 0.01, "conditions": ["DiskPressure"]}]}]}
+```
+
+CPU is in cores and memory in bytes. `request` and `limit` are absent when unset, `throttled` (the
+share of CPU periods held back) when there is no CPU limit. `restarts` and `oomKills` count the last
+24 hours. `cpuWait` and `memoryStall` are the share of time the node's tasks waited.

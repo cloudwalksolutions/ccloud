@@ -104,7 +104,7 @@ var _ = Describe("ccloud workflow logs", func() {
 		Expect(lines(out)).To(HaveExactElements("unit\tFAIL auth"))
 	})
 
-	It("reads a step whose pod is gone from the logs gateway, over the time the step ran", func() {
+	It("reads a step whose pod is gone from the region's gateway, over the time the step ran", func() {
 		ci.podLog("ci-shop", "api-tests-x7k2p-lint-1", "ok 12 files\n")
 		gateway.answers = []string{`{"entries":[
 			{"time":"2026-10-26T07:33:21Z","pod":"api-tests-x7k2p-unit-2","container":"main","line":"FAIL auth"},
