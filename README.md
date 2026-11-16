@@ -95,6 +95,20 @@ of 5xx and p95; every internet host it connected to, by name where the cloud saw
 how many connections got no answer or were reset; and every connection the network refused. A host
 that leaves 10% or more unanswered, or resets any, is flagged.
 
+## App
+
+```sh
+ccloud app
+ccloud app --summary --weeks 2
+```
+
+`ccloud app` lists the app's environments, the region each runs in and where it serves. With
+`--summary`, from the region running its CI: every open pull request with its age, review state,
+each flow's result on its latest commit and the environment it deployed to; then, over `--weeks`
+(4 unless asked), pull requests merged and how long they took to merge and to get a first review,
+prod deploys and how long a merge took to reach prod, and per CI flow its runs, median duration,
+share passing first time and reruns.
+
 ## Your cloud
 
 A build of ccloud serves one cloud. Its regions, their Access hostnames, gateways and pinned CAs,

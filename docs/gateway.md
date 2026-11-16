@@ -59,3 +59,21 @@ window. 400 without `env`; 404 when this region hosts no such environment the ca
 `serverErrors` is the share of requests answered 5xx. `egress` lists internet destinations by DNS
 name where the cloud saw the lookup, else by IP: `connections` opened, `unanswered` of them with no
 SYN-ACK back, and `reset` by the far end. `drops` are connections the network refused.
+
+## `GET /v1/apps/{app}/summary`
+
+Query: `weeks` (default 4). Served by the region running the app's `ci` environment; 404 there for a
+caller who may not read it.
+
+```json
+{"pulls": [{"number": 105, "title": "Search by lake", "author": "dev", "branch": "feat/BOAT-105/search",
+   "openedHoursAgo": 72, "draft": false, "reviewed": true, "environment": "https://boat-105.shop.dev",
+   "checks": [{"flow": "api-tests", "status": "Succeeded", "run": "api-tests-x1"}]}],
+ "flow": {"merged": 2, "openToMergeHours": 12, "firstReviewHours": 1.5},
+ "delivery": {"deploys": 1, "mergeToProdHours": 1},
+ "ci": [{"flow": "api-tests", "runs": 3, "medianSeconds": 700, "firstTryPassRate": 0.5, "reruns": 1}]}
+```
+
+`checks` are each flow's latest run on the pull request's head commit. `flow`, `delivery` and `ci`
+cover the last `weeks`: medians in hours, one prod deploy per commit deployed, and a commit's first
+CI run per flow as its first try.
