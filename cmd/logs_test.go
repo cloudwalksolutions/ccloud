@@ -27,12 +27,18 @@ type fakeGateway struct {
 	hosts     []string
 	resources string
 	network   string
+	summary   string
 }
 
 func (g *fakeGateway) serve(w http.ResponseWriter, r *http.Request) {
 	if strings.HasSuffix(r.URL.Path, "/resources") && g.refuse == 0 {
 		g.asked = append(g.asked, r)
 		_, _ = w.Write([]byte(cmp.Or(g.resources, `{"environments":[]}`)))
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/summary") && g.refuse == 0 {
+		g.asked = append(g.asked, r)
+		_, _ = w.Write([]byte(g.summary))
 		return
 	}
 	if strings.HasSuffix(r.URL.Path, "/network") && g.refuse == 0 {
@@ -43,7 +49,11 @@ func (g *fakeGateway) serve(w http.ResponseWriter, r *http.Request) {
 	if app, ok := strings.CutPrefix(r.URL.Path, "/v1/apps/"); ok && g.refuse == 0 {
 		environments := []string{}
 		for _, env := range g.hosts {
-			environments = append(environments, fmt.Sprintf(`{"name":%q,"namespace":"%s-%s"}`, env, env, app))
+			url := ""
+			if env != "ci" {
+				url = fmt.Sprintf(`,"url":"https://%s.%s.test"`, env, app)
+			}
+			environments = append(environments, fmt.Sprintf(`{"name":%q,"namespace":"%s-%s"%s}`, env, env, app, url))
 		}
 		_, _ = fmt.Fprintf(w, `{"environments":[%s]}`, strings.Join(environments, ","))
 		return
