@@ -22,6 +22,7 @@ type Database struct {
 	Primary string
 	Port    int
 	Secret  string
+	Reset   string
 }
 
 func (c Cloud) AppDir() string {

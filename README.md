@@ -127,6 +127,16 @@ only admins may tunnel into prod, and prod is always preceded by a caution. `--b
 the tunnel open after the command returns, until `--stop`, and tells any AI agent reading the
 output to review writes and sensitive reads with you first.
 
+```sh
+ccloud db reset -e feat-sports-and-divisions
+ccloud db reset -e feat-sports-and-divisions --dangerously-reset
+```
+
+Drops every table in an environment's database, then migrates and seeds it from scratch and restarts
+its API, following the run until it ends. It asks you to type the environment's name first;
+`--dangerously-reset` skips that, and without a terminal it is required. Developers may reset feature environments; only
+admins may reset stage, and no one can reset prod.
+
 ## Your cloud
 
 A build of ccloud serves one cloud. Its regions, their Access hostnames, gateways and pinned CAs,
