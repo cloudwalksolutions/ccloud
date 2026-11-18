@@ -30,7 +30,8 @@ func Cloud() cloud.Cloud {
 			region("us-central1", "k8s.us-central1.cloudwalksolutions.net", 16444, usCentral1),
 			region("us-east1", "k8s.us-east1.cloudwalksolutions.net", 16443, usEast1),
 		},
-		RepoDir: ".cloudwalk",
+		RepoDir:  ".cloudwalk",
+		Releases: "https://api.github.com/repos/cloudwalksolutions/ccloud/releases/latest",
 	}
 }
 

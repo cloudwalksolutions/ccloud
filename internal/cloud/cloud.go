@@ -14,6 +14,7 @@ type Cloud struct {
 	APIServer    string
 	Regions      []Region
 	RepoDir      string
+	Releases     string
 }
 
 func (c Cloud) AppDir() string {

@@ -8,6 +8,9 @@ brew install --cask cloudwalksolutions/tap/ccloud
 
 The cask brings `kubectl`, `cloudflared` and kubelogin with it.
 
+`ccloud --version` says when a newer release is out, and any command says so at most once a day.
+`CCLOUD_NO_UPDATE_CHECK=1` turns that off.
+
 ## Clusters
 
 ```sh

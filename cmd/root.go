@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -22,9 +23,18 @@ func RunContext(ctx context.Context, args []string, stdout, stderr io.Writer, ho
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	running, checks := checkedRelease(home, version)
+	asksVersion := slices.Contains(args, "--version") || slices.Contains(args, "-v")
+	if asksVersion && checks {
+		root.SetVersionTemplate("ccloud version {{.Version}}\n" + newerRelease(home, running))
+	}
 	root.AddCommand(clustersCmd(home), workflowCmd(home), logsCmd(home), topCmd(home), netCmd(home), appInfoCmd(home))
 	root.SetArgs(args)
 	root.SetOut(stdout)
 	root.SetErr(stderr)
-	return root.ExecuteContext(ctx)
+	err := root.ExecuteContext(ctx)
+	if !asksVersion && checks && dueForUpdateCheck() {
+		fmt.Fprint(stderr, newerRelease(home, running))
+	}
+	return err
 }
