@@ -7,6 +7,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
@@ -24,8 +25,26 @@ func (p logPrinter) print(entry gateway.Entry) {
 	case "json":
 		_ = json.NewEncoder(p.out).Encode(entry)
 	default:
-		fmt.Fprintf(p.out, "%s %s %s\n", p.color.paint("90", entry.Time.Local().Format("15:04:05")), entry.Pod, p.readable(entry.Line))
+		line := strings.ReplaceAll(strings.TrimRight(p.readable(entry.Line), "\n"), "\n", "\n    ")
+		fmt.Fprintf(p.out, "%s %s %s %s\n", p.color.paint("90", stamp(entry.Time)), p.color.paint(hue(entry.Container), entry.Container), entry.Pod, line)
 	}
+}
+
+func stamp(at time.Time) string {
+	local := at.Local()
+	if local.Format(time.DateOnly) == time.Now().Format(time.DateOnly) {
+		return local.Format("15:04:05.000")
+	}
+	return local.Format("Jan 02 15:04:05.000")
+}
+
+func hue(container string) string {
+	hues := []string{"32", "34", "35", "36", "92", "94"}
+	sum := 0
+	for _, r := range container {
+		sum += int(r)
+	}
+	return hues[sum%len(hues)]
 }
 
 func (p logPrinter) readable(line string) string {

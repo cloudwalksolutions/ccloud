@@ -62,15 +62,25 @@ going, and its exit handlers still report.
 
 ```sh
 ccloud logs -e prod -l error --since 6h
-ccloud logs -e stage -f -g checkout
+ccloud logs -e stage -f -c api -c nginx
+ccloud logs containers -e stage
+ccloud logs -e prod -l error --since 10m -o json --fail-on-match
 ```
 
 An app's logs in one environment (`prod`, `stage`, `ci`, or a feature environment's name), kept
 for years, so a pod long gone still has them. The region's gateway ([docs/gateway.md](docs/gateway.md)) reads them as you: it asks
 the cluster whether you may read that environment's pod logs, exactly as `kubectl logs` would.
-JSON lines print as `LEVEL message key=value`; `-o raw` gives each line as stored and `-o json` one
-entry per line. `-f` keeps reading until Ctrl-C. The first time, `cloudflared` opens your browser to
-sign in to Cloudflare Access.
+
+Each line shows its time (with the date when not today), container and pod. JSON lines print as
+`LEVEL message key=value`, and a line that runs over several is indented under its first. `-c`
+picks containers and repeats; `ccloud logs containers` lists an environment's. `--since`,
+`--since-time` and `--until` set the window, and a note says when `--tail` cut lines off.
+
+`-f` follows the gateway's live stream until Ctrl-C, reconnecting on its own after a drop and
+printing each line once. `-o raw` gives each line as stored; `-o json` gives one entry per line, with
+its stream and level, then a `{"next": …}` line to resume from with `--since-time`.
+`--fail-on-match` exits non-zero when any line matched, for scripts and agents. The first time,
+`cloudflared` opens your browser to sign in to Cloudflare Access.
 
 ## Top
 

@@ -39,7 +39,7 @@ func failed(phase string) bool {
 }
 
 func keptLog(kept *logReader, app string, run workflows.Run, step workflows.Step) (string, error) {
-	entries, err := kept.read(url.Values{
+	page, err := kept.read(url.Values{
 		"namespace": {"ci-" + app},
 		"pod":       {run.PodName(step)},
 		"container": {"main"},
@@ -49,7 +49,7 @@ func keptLog(kept *logReader, app string, run workflows.Run, step workflows.Step
 		"limit":     {"5000"},
 	})
 	var text strings.Builder
-	for _, entry := range entries {
+	for _, entry := range page.Entries {
 		text.WriteString(entry.Line + "\n")
 	}
 	return text.String(), err
