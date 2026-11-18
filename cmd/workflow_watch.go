@@ -14,6 +14,11 @@ const clearScreen = "\x1b[H\x1b[2J"
 
 func workflowWatch(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs, run workflows.Run) error {
 	interval, _ := c.Flags().GetDuration("interval")
+	strict, _ := c.Flags().GetBool("exit-status")
+	return follow(c, region, app, runs, run, interval, strict)
+}
+
+func follow(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs, run workflows.Run, interval time.Duration, strict bool) error {
 	out := c.OutOrStdout()
 	redraw := terminal(out)
 	var err error
@@ -28,7 +33,7 @@ func workflowWatch(c *cobra.Command, region cloud.Region, app string, runs workf
 			return nil
 		case <-time.After(interval):
 		}
-		run, err = getRun(c, runs, region, app)
+		run, err = getRun(c, runs, region, app, run.Name())
 	}
 	if err != nil {
 		return err
@@ -38,7 +43,7 @@ func workflowWatch(c *cobra.Command, region cloud.Region, app string, runs workf
 	}
 	render(out, run, time.Now())
 	fmt.Fprintf(out, "\n%s %s completed: %s\n", paletteFor(out).status(run.Status.Phase), run.Name(), run.Status.Phase)
-	if strict, _ := c.Flags().GetBool("exit-status"); strict && run.Status.Phase != "Succeeded" {
+	if strict && run.Status.Phase != "Succeeded" {
 		return fmt.Errorf("%s did not succeed: %s", run.Name(), run.Status.Phase)
 	}
 	return nil

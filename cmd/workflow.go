@@ -76,7 +76,7 @@ type runAction func(c *cobra.Command, region cloud.Region, app string, runs work
 func runCmd(home cloud.Cloud, command *cobra.Command, action runAction) *cobra.Command {
 	command.Args = oneRun
 	return ciCmd(home, command, func(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs) error {
-		run, err := getRun(c, runs, region, app)
+		run, err := getRun(c, runs, region, app, c.Flags().Arg(0))
 		if err != nil {
 			return err
 		}
@@ -84,8 +84,7 @@ func runCmd(home cloud.Cloud, command *cobra.Command, action runAction) *cobra.C
 	})
 }
 
-func getRun(c *cobra.Command, runs workflows.Runs, region cloud.Region, app string) (workflows.Run, error) {
-	name := c.Flags().Arg(0)
+func getRun(c *cobra.Command, runs workflows.Runs, region cloud.Region, app, name string) (workflows.Run, error) {
 	run, err := runs.Get(c.Context(), name)
 	if apierrors.IsNotFound(err) {
 		return run, fmt.Errorf("%s has no run %s in %s; see ccloud workflow list -a %s -r %s", app, name, region.Name, app, region.Name)

@@ -32,7 +32,7 @@ func dbCmd(home cloud.Cloud) *cobra.Command {
 	tunnel.Flags().BoolP("sensitive", "s", false, "print the password whole, rather than its first characters")
 	tunnel.Flags().Bool("background", false, "keep the tunnel open after the command returns, until --stop")
 	tunnel.Flags().Bool("stop", false, "close the environment's tunnel open in the background")
-	db.AddCommand(tunnel)
+	db.AddCommand(tunnel, dbResetCmd(home))
 	return db
 }
 

@@ -36,6 +36,7 @@ func Cloud() cloud.Cloud {
 			Primary: "postgres-operator.crunchydata.com/cluster=crunchydb,postgres-operator.crunchydata.com/role=master",
 			Port:    5432,
 			Secret:  "crunchydb-pguser-crunchydb",
+			Reset:   "db-reset",
 		},
 	}
 }
