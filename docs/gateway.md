@@ -7,15 +7,35 @@ gateway answers as that caller, exactly as the cluster's RBAC would.
 
 ## `GET /v1/logs`
 
-Query: `namespace` (one or more, required), `start`, `end` (RFC 3339), `limit`, `direction`
-(`forward` or `backward`), `pod` (prefix), `container`, `contains`, `regex`, `level` (`error` or
-`warn`).
+Query: `namespace` (one or more, required), `start`, `end` (RFC 3339), `limit` (1 to 5000),
+`direction` (`forward` or `backward`), `pod` (prefix), `container` (one or more), `contains`,
+`regex`, `level` (`error` or `warn`).
 
 ```json
-{"entries": [{"time": "2026-10-26T07:33:21Z", "namespace": "prod-shop", "pod": "api-7f9c", "container": "api", "line": "db query failed"}]}
+{"entries": [{"time": "2026-10-26T07:33:21Z", "namespace": "prod-shop", "pod": "api-7f9c", "container": "api",
+  "stream": "stderr", "level": "error", "line": "db query failed"}], "truncated": false}
 ```
 
-403 when the caller may not read pod logs in every namespace named.
+Entries come oldest first. `stream` is `stdout` or `stderr`. `level` is `error`, `warn` or empty, by
+the same patterns `level` filters on. `truncated` is true when `limit` cut the answer short. 403
+when the caller may not read pod logs in every namespace named; 400 for a parameter it cannot use.
+
+## `GET /v1/logs/containers`
+
+Query: `namespace` (one or more, required), `start`. The containers those namespaces have logged
+since `start`.
+
+```json
+{"containers": ["api", "nginx"]}
+```
+
+## `GET /v1/logs/stream`
+
+The same query as `/v1/logs` but `start` alone, answering NDJSON (`application/x-ndjson`): one
+entry per line as it arrives, each sent once, from `start` on (a few seconds ago when absent). A
+quiet stream sends `{}` now and then so proxies keep it open. A stream ends with one line naming
+why: `{"end": "max duration"}` (reconnect from the last entry's time), `{"end": "access revoked"}`,
+or another reason. 429 when the caller already follows as many streams as the gateway allows.
 
 ## `GET /v1/apps/{app}`
 

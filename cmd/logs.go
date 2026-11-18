@@ -1,13 +1,13 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -30,15 +30,42 @@ func logsCmd(home cloud.Cloud) *cobra.Command {
 	flags := command.Flags()
 	flags.StringP("env", "e", "", "the environment: prod, stage, ci, or a feature environment's name")
 	flags.Duration("since", time.Hour, "how far back to read")
+	flags.String("since-time", "", "read from this time, such as 2026-10-26T07:00:00Z, rather than --since ago")
+	flags.String("until", "", "read up to this time, or a while ago such as 10m; now when left out")
 	flags.Int("tail", 200, "at most this many lines, the newest")
 	flags.String("pod", "", "only pods whose name starts with this")
-	flags.StringP("container", "c", "", "only this container")
+	flags.StringArrayP("container", "c", nil, "only this container; repeat for several")
 	flags.StringP("grep", "g", "", "only lines containing this text")
 	flags.StringP("regex", "E", "", "only lines matching this regular expression")
 	flags.StringP("level", "l", "", "only errors (error) or errors and warnings (warn)")
 	flags.BoolP("follow", "f", false, "keep reading new lines until you press Ctrl-C")
+	flags.Bool("fail-on-match", false, "exit non-zero when any line matched, such as with --level error in a script")
 	flags.StringP("output", "o", "pretty", "pretty, raw (each line as stored) or json (one entry per line)")
-	flags.DurationP("interval", "i", 2*time.Second, "with --follow, how often to look for new lines")
+	command.AddCommand(logContainersCmd(home))
+	return command
+}
+
+func logContainersCmd(home cloud.Cloud) *cobra.Command {
+	command := appCmd(home, &cobra.Command{
+		Use:     "containers --env <env> [--app <app>]",
+		Short:   "List the containers an environment has logged in the last day, to pick from with -c",
+		Example: "  ccloud logs containers -e stage",
+	}, namedEnv, func(c *cobra.Command, region cloud.Region, app string) error {
+		env, _ := c.Flags().GetString("env")
+		signedIn, err := signInToGateway(c, home, region)
+		var containers []string
+		if err == nil {
+			containers, err = signedIn.Containers(c.Context(), url.Values{
+				"namespace": {env + "-" + app},
+				"start":     {time.Now().Add(-24 * time.Hour).UTC().Format(time.RFC3339)},
+			})
+		}
+		for _, container := range containers {
+			fmt.Fprintln(c.OutOrStdout(), container)
+		}
+		return err
+	})
+	command.Flags().StringP("env", "e", "", "the environment: prod, stage, ci, or a feature environment's name")
 	return command
 }
 
@@ -53,41 +80,107 @@ func namedEnv(c *cobra.Command) (string, error) {
 func readLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app string) error {
 	env, _ := c.Flags().GetString("env")
 	reader := &logReader{c: c, home: home, region: region}
-	query := logsQuery(c, env+"-"+app)
+	query, err := logsQuery(c, env+"-"+app)
+	if err != nil {
+		return err
+	}
 	follow, _ := c.Flags().GetBool("follow")
-	interval, _ := c.Flags().GetDuration("interval")
+	strict, _ := c.Flags().GetBool("fail-on-match")
 	format, _ := c.Flags().GetString("output")
+	if !slices.Contains([]string{"pretty", "raw", "json"}, format) {
+		return fmt.Errorf("output is pretty, raw or json, not %q", format)
+	}
 	printer := logPrinter{out: c.OutOrStdout(), format: format, color: paletteFor(c.OutOrStdout())}
-	ctx := c.Context()
-	for {
-		entries, err := reader.read(query)
-		if ctx.Err() != nil {
-			return nil
-		}
-		var refused gateway.Refused
-		if errors.As(err, &refused) && refused.Status == http.StatusForbidden {
-			err = fmt.Errorf("you may not read %s's %s logs in %s: %s", app, env, region.Name, refused.Reason)
-		}
-		if err != nil {
-			return err
-		}
-		for _, entry := range entries {
-			printer.print(entry)
-		}
-		if !follow {
-			return nil
-		}
+	page, err := reader.read(query)
+	if c.Context().Err() != nil {
+		return nil
+	}
+	if err != nil {
+		return mayNotRead(err, app, env, region)
+	}
+	entries := page.Entries
+	for _, entry := range entries {
+		printer.print(entry)
+	}
+	switch {
+	case strict && len(entries) > 0:
+		return fmt.Errorf("%s matched", quantity(len(entries), "line"))
+	case follow:
+		from := time.Now().UTC()
 		if len(entries) > 0 {
-			query.Set("start", entries[len(entries)-1].Time.Add(time.Nanosecond).UTC().Format(time.RFC3339Nano))
+			from = entries[len(entries)-1].Time
 		}
-		query.Set("direction", "forward")
-		wait, stop := context.WithTimeout(ctx, interval)
-		<-wait.Done()
-		stop()
+		return followLogs(c, reader, query, printer, from, strict, app, env, region)
+	}
+	if format == "json" && len(entries) > 0 {
+		_ = json.NewEncoder(c.OutOrStdout()).Encode(map[string]string{"next": entries[len(entries)-1].Time.Add(time.Nanosecond).UTC().Format(time.RFC3339Nano)})
+	}
+	if page.Truncated {
+		fmt.Fprintf(c.ErrOrStderr(), "Showed the newest %d lines; raise --tail or narrow --since or --until for more.\n", len(entries))
+	}
+	return nil
+}
+
+var errMatched = errors.New("a line matched")
+
+func followLogs(c *cobra.Command, reader *logReader, query url.Values, printer logPrinter, from time.Time, strict bool, app, env string, region cloud.Region) error {
+	for _, key := range []string{"limit", "direction", "end"} {
+		query.Del(key)
+	}
+	printed := map[gateway.Entry]bool{}
+	wait, signedInAgain := time.Second, false
+	for {
+		query.Set("start", from.UTC().Format(time.RFC3339Nano))
+		end, err := reader.stream(query, func(entry gateway.Entry) error {
+			if printed[entry] {
+				return nil
+			}
+			if entry.Time.After(from) {
+				from, printed = entry.Time, map[gateway.Entry]bool{}
+			}
+			printed[entry] = true
+			printer.print(entry)
+			wait = time.Second
+			if strict {
+				return errMatched
+			}
+			return nil
+		})
+		var refused gateway.Refused
+		errors.As(err, &refused)
+		switch {
+		case c.Context().Err() != nil:
+			return nil
+		case errors.Is(err, errMatched), errors.Is(err, gateway.ErrNotLogs), reader.signedIn == nil:
+			return err
+		case end == "max duration":
+			continue
+		case end == "access revoked":
+			return fmt.Errorf("you may no longer read %s's %s logs in %s", app, env, region.Name)
+		case refused.Status == http.StatusUnauthorized && !signedInAgain:
+			reader.signedIn, signedInAgain = nil, true
+			continue
+		case refused.Status >= 400 && refused.Status < 500:
+			return mayNotRead(err, app, env, region)
+		}
+		select {
+		case <-c.Context().Done():
+			return nil
+		case <-time.After(wait):
+		}
+		wait = min(2*wait, 30*time.Second)
 	}
 }
 
-func logsQuery(c *cobra.Command, namespace string) url.Values {
+func mayNotRead(err error, app, env string, region cloud.Region) error {
+	var refused gateway.Refused
+	if errors.As(err, &refused) && refused.Status == http.StatusForbidden {
+		err = fmt.Errorf("you may not read %s's %s logs in %s: %s", app, env, region.Name, refused.Reason)
+	}
+	return err
+}
+
+func logsQuery(c *cobra.Command, namespace string) (url.Values, error) {
 	flags := c.Flags()
 	since, _ := flags.GetDuration("since")
 	tail, _ := flags.GetInt("tail")
@@ -97,12 +190,36 @@ func logsQuery(c *cobra.Command, namespace string) url.Values {
 		"limit":     {strconv.Itoa(tail)},
 		"direction": {"backward"},
 	}
-	for flag, param := range map[string]string{"pod": "pod", "container": "container", "grep": "contains", "regex": "regex", "level": "level"} {
+	if start, _ := flags.GetString("since-time"); start != "" {
+		query.Set("start", start)
+	}
+	if until, _ := flags.GetString("until"); until != "" {
+		end, err := endOf(until)
+		if err != nil {
+			return nil, err
+		}
+		query.Set("end", end)
+	}
+	for flag, param := range map[string]string{"pod": "pod", "grep": "contains", "regex": "regex", "level": "level"} {
 		if value, _ := flags.GetString(flag); value != "" {
 			query.Set(param, value)
 		}
 	}
-	return query
+	if containers, _ := flags.GetStringArray("container"); len(containers) > 0 {
+		query["container"] = containers
+	}
+	return query, nil
+}
+
+func endOf(until string) (string, error) {
+	if _, err := time.Parse(time.RFC3339Nano, until); err == nil {
+		return until, nil
+	}
+	ago, err := time.ParseDuration(until)
+	if err != nil {
+		return "", fmt.Errorf("--until is a time like 2026-10-26T08:00:00Z or a while ago like 10m, not %q", until)
+	}
+	return time.Now().Add(-ago).UTC().Format(time.RFC3339), nil
 }
 
 type logReader struct {
@@ -112,15 +229,30 @@ type logReader struct {
 	signedIn *gateway.Gateway
 }
 
-func (r *logReader) read(query url.Values) ([]gateway.Entry, error) {
-	if r.signedIn == nil {
-		g, err := signInToGateway(r.c, r.home, r.region)
-		if err != nil {
-			return nil, err
-		}
-		r.signedIn = &g
+func (r *logReader) read(query url.Values) (gateway.Page, error) {
+	if err := r.signIn(); err != nil {
+		return gateway.Page{}, err
 	}
 	return r.signedIn.Read(r.c.Context(), query)
+}
+
+func (r *logReader) stream(query url.Values, each func(gateway.Entry) error) (string, error) {
+	if err := r.signIn(); err != nil {
+		return "", err
+	}
+	return r.signedIn.Stream(r.c.Context(), query, each)
+}
+
+func (r *logReader) signIn() error {
+	if r.signedIn != nil {
+		return nil
+	}
+	g, err := signInToGateway(r.c, r.home, r.region)
+	r.signedIn = &g
+	if err != nil {
+		r.signedIn = nil
+	}
+	return err
 }
 
 func signInToGateway(c *cobra.Command, home cloud.Cloud, region cloud.Region) (gateway.Gateway, error) {
