@@ -112,10 +112,26 @@ each flow's result on its latest commit and the environment it deployed to; then
 prod deploys and how long a merge took to reach prod, and per CI flow its runs, median duration,
 share passing first time and reruns.
 
+## Database
+
+```sh
+ccloud db tunnel -e stage
+ccloud db tunnel -e stage --background
+ccloud db tunnel -e stage --stop
+```
+
+Opens a local port to an environment's database primary, by default 5432 or the next free port, and
+prints the host, port, database, user, password and URL a client needs. The password is cut to its
+first characters unless you pass `-s`. Developers may tunnel into stage and feature environments;
+only admins may tunnel into prod, and prod is always preceded by a caution. `--background` keeps
+the tunnel open after the command returns, until `--stop`, and tells any AI agent reading the
+output to review writes and sensitive reads with you first.
+
 ## Your cloud
 
 A build of ccloud serves one cloud. Its regions, their Access hostnames, gateways and pinned CAs,
-the OIDC issuer, the API server's name and the app repo directory are one `cloud.Cloud` value; `internal/cloud/cloudwalk` is
+the OIDC issuer, the API server's name, the app repo directory and where each environment's
+database is are one `cloud.Cloud` value; `internal/cloud/cloudwalk` is
 CloudWalk's. The OIDC client is stamped in at release from the `GOOGLE_CLIENT_ID` and
 `GOOGLE_CLIENT_SECRET` Actions secrets, so a plain `go build` cannot sign in.
 

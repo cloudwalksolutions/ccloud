@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/pem"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,7 +14,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/client-go/tools/clientcmd"
 	api "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -89,10 +94,14 @@ type fakeCluster struct {
 	logs       map[string]string
 	unwritable map[string]bool
 	writes     []written
+	secrets    map[string]map[string]string
+	pods       map[string][]corev1.Pod
+	forwarded  chan string
 }
 
 func newFakeCluster() *fakeCluster {
-	f := &fakeCluster{byNS: map[string][]workflow{}, forbidden: map[string]bool{}, logs: map[string]string{}, unwritable: map[string]bool{}}
+	f := &fakeCluster{byNS: map[string][]workflow{}, forbidden: map[string]bool{}, logs: map[string]string{}, unwritable: map[string]bool{},
+		secrets: map[string]map[string]string{}, pods: map[string][]corev1.Pod{}, forwarded: make(chan string, 10)}
 	f.server = httptest.NewTLSServer(http.HandlerFunc(f.serve))
 	DeferCleanup(f.server.Close)
 	return f
@@ -170,8 +179,95 @@ func (f *fakeCluster) serveLog(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(text))
 }
 
+func (f *fakeCluster) secret(namespace, name string, data map[string]string) {
+	f.secrets[namespace+"/"+name] = data
+}
+
+func (f *fakeCluster) pod(namespace, name string, podLabels map[string]string) {
+	f.pods[namespace] = append(f.pods[namespace], corev1.Pod{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Labels: podLabels},
+	})
+}
+
+func (f *fakeCluster) status(w http.ResponseWriter, code int, reason metav1.StatusReason, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(metav1.Status{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Status"},
+		Status:   metav1.StatusFailure, Reason: reason, Code: int32(code), Message: message,
+	})
+}
+
+func (f *fakeCluster) serveCore(w http.ResponseWriter, r *http.Request, namespace, kind string, rest []string) {
+	if f.forbidden[namespace] {
+		f.status(w, http.StatusForbidden, metav1.StatusReasonForbidden, kind+` is forbidden: User "dev@example.test" cannot get resource "`+kind+`"`)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	switch {
+	case kind == "secrets" && len(rest) == 1 && f.secrets[namespace+"/"+rest[0]] != nil:
+		secret := corev1.Secret{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: metav1.ObjectMeta{Name: rest[0]}, Data: map[string][]byte{}}
+		for key, value := range f.secrets[namespace+"/"+rest[0]] {
+			secret.Data[key] = []byte(value)
+		}
+		_ = json.NewEncoder(w).Encode(secret)
+	case kind == "pods" && len(rest) == 0:
+		selector, _ := labels.Parse(r.URL.Query().Get("labelSelector"))
+		list := corev1.PodList{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "PodList"}}
+		for _, pod := range f.pods[namespace] {
+			if selector.Matches(labels.Set(pod.Labels)) {
+				list.Items = append(list.Items, pod)
+			}
+		}
+		_ = json.NewEncoder(w).Encode(list)
+	case kind == "pods" && len(rest) == 2 && rest[1] == "portforward" && f.unwritable[namespace]:
+		f.status(w, http.StatusForbidden, metav1.StatusReasonForbidden, `pods "`+rest[0]+`" is forbidden: User "dev@example.test" cannot create resource "pods/portforward"`)
+	case kind == "pods" && len(rest) == 2 && rest[1] == "portforward":
+		f.portForward(w, r, namespace+"/"+rest[0])
+	default:
+		f.status(w, http.StatusNotFound, metav1.StatusReasonNotFound, kind+` "`+strings.Join(rest, "/")+`" not found`)
+	}
+}
+
+func (f *fakeCluster) portForward(w http.ResponseWriter, r *http.Request, pod string) {
+	if _, err := httpstream.Handshake(r, w, []string{"portforward.k8s.io"}); err != nil {
+		return
+	}
+	streams := make(chan httpstream.Stream)
+	connection := spdy.NewResponseUpgrader().UpgradeResponse(w, r, func(stream httpstream.Stream, _ <-chan struct{}) error {
+		streams <- stream
+		return nil
+	})
+	if connection == nil {
+		return
+	}
+	defer func() { _ = connection.Close() }()
+	for {
+		select {
+		case stream := <-streams:
+			if stream.Headers().Get("streamType") == "error" {
+				_ = stream.Close()
+				continue
+			}
+			f.forwarded <- pod + ":" + stream.Headers().Get("port")
+			go func() {
+				_, _ = io.Copy(stream, stream)
+				_ = stream.Close()
+			}()
+		case <-connection.CloseChan():
+			return
+		}
+	}
+}
+
 func (f *fakeCluster) serve(w http.ResponseWriter, r *http.Request) {
-	if strings.HasPrefix(r.URL.Path, "/api/v1/namespaces/") && strings.HasSuffix(r.URL.Path, "/log") {
+	if core, ok := strings.CutPrefix(r.URL.Path, "/api/v1/namespaces/"); ok && !strings.HasSuffix(core, "/log") {
+		parts := strings.Split(core, "/")
+		f.serveCore(w, r, parts[0], parts[1], parts[2:])
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/v1/namespaces/") {
 		f.serveLog(w, r)
 		return
 	}
