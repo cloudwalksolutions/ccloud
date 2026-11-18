@@ -128,8 +128,8 @@ the tunnel open after the command returns, until `--stop`, and tells any AI agen
 output to review writes and sensitive reads with you first.
 
 ```sh
-ccloud db reset -e feat-sports-and-divisions
-ccloud db reset -e feat-sports-and-divisions --dangerously-reset
+ccloud db reset -e feat-new-checkout
+ccloud db reset -e feat-new-checkout --dangerously-reset
 ```
 
 Drops every table in an environment's database, then migrates and seeds it from scratch and restarts

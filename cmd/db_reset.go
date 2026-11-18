@@ -18,7 +18,7 @@ func dbResetCmd(home cloud.Cloud) *cobra.Command {
 	reset := appCmd(home, &cobra.Command{
 		Use:     "reset --env <env> [--app <app>]",
 		Short:   "Drop an environment's database and migrate and seed it again from scratch",
-		Example: "  ccloud db reset -e feat-sports-and-divisions",
+		Example: "  ccloud db reset -e feat-new-checkout",
 	}, namedEnv, func(c *cobra.Command, region cloud.Region, app string) error {
 		return dbReset(c, home, region, app)
 	})
