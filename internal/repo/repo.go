@@ -10,14 +10,14 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func App(start, dir string) (string, error) {
+func App(start, dir string) (string, string, error) {
 	for {
 		path := filepath.Join(start, dir, "app.yaml")
 		data, err := os.ReadFile(path)
 		if errors.Is(err, fs.ErrNotExist) {
 			parent := filepath.Dir(start)
 			if parent == start {
-				return "", nil
+				return "", "", nil
 			}
 			start = parent
 			continue
@@ -29,8 +29,8 @@ func App(start, dir string) (string, error) {
 			err = yaml.Unmarshal(data, &file)
 		}
 		if err != nil {
-			return "", fmt.Errorf("cannot read %s: %w", path, err)
+			return "", "", fmt.Errorf("cannot read %s: %w", path, err)
 		}
-		return file.App, nil
+		return start, file.App, nil
 	}
 }

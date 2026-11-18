@@ -85,7 +85,7 @@ func dbTunnel(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 }
 
 func (t dbConnection) print(out io.Writer, closer string) error {
-	password := t.owner.Password[:min(4, len(t.owner.Password))] + "…"
+	password := truncated(t.owner.Password)
 	userinfo := t.owner.User + ":" + password
 	if t.sensitive {
 		password = t.owner.Password
@@ -100,6 +100,10 @@ func (t dbConnection) print(out io.Writer, closer string) error {
 	fmt.Fprintf(table, "  password\t%s\n", password)
 	fmt.Fprintf(table, "  url\tpostgres://%s@localhost:%d/%s\n", userinfo, t.port, t.owner.Name)
 	return table.Flush()
+}
+
+func truncated(secret string) string {
+	return secret[:min(4, len(secret))] + "…"
 }
 
 func cautionAboutProd(out io.Writer, app string) {
