@@ -36,6 +36,10 @@ var _ = Describe("the cloudwalk cloud", func() {
 		}
 	})
 
+	It("learns of newer releases from ccloud's own GitHub releases", func() {
+		Expect(cloudwalk.Cloud().Releases).To(Equal("https://api.github.com/repos/cloudwalksolutions/ccloud/releases/latest"))
+	})
+
 	It("finds an app repo's file under .cloudwalk, beside its workflows", func() {
 		Expect(cloudwalk.Cloud().AppDir()).To(Equal(".cloudwalk"))
 	})
