@@ -101,7 +101,7 @@ var _ = Describe("ccloud clusters credentials", func() {
 
 		err := cmd.RunContext(impatient, []string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")
 
-		Expect(err).To(MatchError("cloudflared did not open " + address + " for k8s.north1.example.test in time"))
+		Expect(err).To(MatchError("cloudflared for k8s.north1.example.test did not open " + address + " in time"))
 	}, SpecTimeout(5*time.Second))
 
 	It("names cloudflared when it is not installed", func() {

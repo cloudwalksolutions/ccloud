@@ -15,6 +15,13 @@ type Cloud struct {
 	Regions      []Region
 	RepoDir      string
 	Releases     string
+	Database     Database
+}
+
+type Database struct {
+	Primary string
+	Port    int
+	Secret  string
 }
 
 func (c Cloud) AppDir() string {

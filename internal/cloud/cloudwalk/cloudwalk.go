@@ -32,6 +32,11 @@ func Cloud() cloud.Cloud {
 		},
 		RepoDir:  ".cloudwalk",
 		Releases: "https://api.github.com/repos/cloudwalksolutions/ccloud/releases/latest",
+		Database: cloud.Database{
+			Primary: "postgres-operator.crunchydata.com/cluster=crunchydb,postgres-operator.crunchydata.com/role=master",
+			Port:    5432,
+			Secret:  "crunchydb-pguser-crunchydb",
+		},
 	}
 }
 

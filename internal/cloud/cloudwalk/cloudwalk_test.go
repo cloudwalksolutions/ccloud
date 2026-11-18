@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 	"github.com/cloudwalksolutions/ccloud/internal/cloud/cloudwalk"
 )
 
@@ -42,5 +43,13 @@ var _ = Describe("the cloudwalk cloud", func() {
 
 	It("finds an app repo's file under .cloudwalk, beside its workflows", func() {
 		Expect(cloudwalk.Cloud().AppDir()).To(Equal(".cloudwalk"))
+	})
+
+	It("tunnels to the leader of each environment's Postgres cluster, as its owner, the one secret developers may read", func() {
+		Expect(cloudwalk.Cloud().Database).To(Equal(cloud.Database{
+			Primary: "postgres-operator.crunchydata.com/cluster=crunchydb,postgres-operator.crunchydata.com/role=master",
+			Port:    5432,
+			Secret:  "crunchydb-pguser-crunchydb",
+		}))
 	})
 })

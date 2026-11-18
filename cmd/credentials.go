@@ -57,21 +57,25 @@ func tunnel(ctx context.Context, region cloud.Region, address string) error {
 		return nil
 	}
 	cloudflared := exec.Command("cloudflared", "access", "tcp", "--hostname", region.Host, "--url", address)
-	cloudflared.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	if err := cloudflared.Start(); err != nil {
-		return fmt.Errorf("starting cloudflared for %s: %w", region.Host, err)
+	return detach(ctx, cloudflared, address, "cloudflared for "+region.Host)
+}
+
+func detach(ctx context.Context, process *exec.Cmd, address, what string) error {
+	process.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := process.Start(); err != nil {
+		return fmt.Errorf("starting %s: %w", what, err)
 	}
 	exited := make(chan error, 1)
-	go func() { exited <- cloudflared.Wait() }()
+	go func() { exited <- process.Wait() }()
 
 	ctx, stop := context.WithTimeout(ctx, 20*time.Second)
 	defer stop()
 	for {
 		select {
 		case err := <-exited:
-			return fmt.Errorf("cloudflared exited before %s was reachable at %s: %v", region.Host, address, err)
+			return fmt.Errorf("%s exited before opening %s: %v", what, address, err)
 		case <-ctx.Done():
-			return fmt.Errorf("cloudflared did not open %s for %s in time", address, region.Host)
+			return fmt.Errorf("%s did not open %s in time", what, address)
 		case <-time.After(100 * time.Millisecond):
 			if listening(address) {
 				return nil

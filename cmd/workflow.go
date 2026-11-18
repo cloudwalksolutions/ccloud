@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/rest"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
-	"github.com/cloudwalksolutions/ccloud/internal/kubeconfig"
 	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
@@ -63,13 +63,9 @@ func workflowCmd(home cloud.Cloud) *cobra.Command {
 
 func ciCmd(home cloud.Cloud, command *cobra.Command, action func(*cobra.Command, cloud.Region, string, workflows.Runs) error) *cobra.Command {
 	return appCmd(home, command, ciEnv, func(c *cobra.Command, region cloud.Region, app string) error {
-		cfg, err := kubeconfig.REST(kubeconfig.Path(), region.Context())
+		runs, err := connect(region, func(cfg *rest.Config) (workflows.Runs, error) { return workflows.In(cfg, "ci-"+app) })
 		if err != nil {
-			return signInError(err, region)
-		}
-		runs, err := workflows.In(cfg, "ci-"+app)
-		if err != nil {
-			return fmt.Errorf("your %s context is damaged; sign in again with ccloud clusters auth --region %s: %w", region.Context(), region.Name, err)
+			return err
 		}
 		return action(c, region, app, runs)
 	})
