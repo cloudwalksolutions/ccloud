@@ -239,6 +239,18 @@ var _ = Describe("ccloud env pull", func() {
 			Expect(out.String()).To(Equal("2 added, 0 changed and 0 unchanged in src/api/.env, copied from shop's feat-x in north1.\n"))
 		})
 
+		It("writes to the env file you name, from the repo's root, when your API reads another", func() {
+			Expect(os.MkdirAll(filepath.Join(repo, "src", "web"), 0o755)).To(Succeed())
+			in(filepath.Join(repo, "src", "web"))
+
+			Expect(run("env", "pull", "--file", "server/.env.local")).To(Succeed())
+
+			written, err := os.ReadFile(filepath.Join(repo, "server", ".env.local"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(written)).To(HavePrefix("STRIPE_KEY=sk_test_123\n"))
+			Expect(out.String()).To(HavePrefix("2 added, 0 changed and 0 unchanged in server/.env.local,"))
+		})
+
 		It("adds only what your env file lacks, leaving your own settings and notes as they are", func() {
 			writeEnvFile("# local\nDB_HOST=localhost\nSECRET_KEY=\"has space #hash\"\n")
 

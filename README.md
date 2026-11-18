@@ -149,7 +149,7 @@ file, under the names the API reads them by, with the values from the dev projec
 It uses your own Google sign-in (`gcloud auth application-default login`), so you need to be one of
 the app's developers. Without `-e` it copies the app's one running feature environment. It only
 adds what your file lacks. Where a value differs it changes nothing and shows the start of each
-value, unless you pass `--force`. Your own settings, such as the database and Redis, are never
+value, unless you pass `--force`. `--file` writes another env file, from the repo's root. Your own settings, such as the database and Redis, are never
 touched.
 
 ## Your cloud

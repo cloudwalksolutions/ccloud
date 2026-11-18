@@ -37,6 +37,7 @@ func envCmd(home cloud.Cloud) *cobra.Command {
 	pull.Flags().StringP("env", "e", "", "the feature environment to copy; the app's only one when left out")
 	pull.Flags().StringP("region", "r", "", "the region running it; found for you when left out")
 	pull.Flags().BoolP("force", "f", false, "replace values in your env file that differ from the environment's")
+	pull.Flags().String("file", home.Env.File, "the env file to write, from the repo's root")
 	env.AddCommand(pull)
 	return env
 }
@@ -75,7 +76,8 @@ func envPull(c *cobra.Command, home cloud.Cloud) error {
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(root, home.Env.File)
+	file, _ := c.Flags().GetString("file")
+	path := filepath.Join(root, file)
 	existing, _ := os.ReadFile(path)
 	force, _ := c.Flags().GetBool("force")
 	merged, changes := dotenv.Merge(string(existing), vars, force)
@@ -84,12 +86,12 @@ func envPull(c *cobra.Command, home cloud.Cloud) error {
 		for i, d := range changes.Differ {
 			differ[i] = fmt.Sprintf("  %s  %s → %s", d.Name, truncated(d.Was), truncated(d.Is))
 		}
-		return fmt.Errorf("%s differs from %s's %s; pass --force to replace:\n%s", home.Env.File, app, env, strings.Join(differ, "\n"))
+		return fmt.Errorf("%s differs from %s's %s; pass --force to replace:\n%s", file, app, env, strings.Join(differ, "\n"))
 	}
 	err = errors.Join(os.MkdirAll(filepath.Dir(path), 0o755), os.WriteFile(path, []byte(merged), 0o600))
 	if err == nil {
 		_, err = fmt.Fprintf(c.OutOrStdout(), "%d added, %d changed and %d unchanged in %s, copied from %s's %s in %s.\n",
-			changes.Added, changes.Changed, changes.Unchanged, home.Env.File, app, env, region.Name)
+			changes.Added, changes.Changed, changes.Unchanged, file, app, env, region.Name)
 	}
 	return err
 }
