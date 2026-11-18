@@ -53,4 +53,13 @@ var _ = Describe("the cloudwalk cloud", func() {
 			Reset:   "db-reset",
 		}))
 	})
+
+	It("copies the secrets each app's API container gets into the env file its repo's API reads, from Google's Secret Manager", func() {
+		Expect(cloudwalk.Cloud().Env).To(Equal(cloud.Env{
+			Deployment:    "api-dep",
+			Container:     "api",
+			File:          "src/api/.env",
+			SecretManager: "https://secretmanager.googleapis.com",
+		}))
+	})
 })

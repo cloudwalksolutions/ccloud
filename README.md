@@ -137,6 +137,21 @@ its API, following the run until it ends. It asks you to type the environment's 
 `--dangerously-reset` skips that, and without a terminal it is required. Developers may reset feature environments; only
 admins may reset stage, and no one can reset prod.
 
+## Env
+
+```sh
+ccloud env pull
+ccloud env pull -e feat-new-checkout --force
+```
+
+Run inside an app repo. It writes the secrets a feature environment's API gets into your local env
+file, under the names the API reads them by, with the values from the dev project's Secret Manager.
+It uses your own Google sign-in (`gcloud auth application-default login`), so you need to be one of
+the app's developers. Without `-e` it copies the app's one running feature environment. It only
+adds what your file lacks. Where a value differs it changes nothing and shows the start of each
+value, unless you pass `--force`. Your own settings, such as the database and Redis, are never
+touched.
+
 ## Your cloud
 
 A build of ccloud serves one cloud. Its regions, their Access hostnames, gateways and pinned CAs,

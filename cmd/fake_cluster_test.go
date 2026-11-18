@@ -97,11 +97,12 @@ type fakeCluster struct {
 	secrets    map[string]map[string]string
 	pods       map[string][]corev1.Pod
 	forwarded  chan string
+	objects    map[string]any
 }
 
 func newFakeCluster() *fakeCluster {
 	f := &fakeCluster{byNS: map[string][]workflow{}, forbidden: map[string]bool{}, logs: map[string]string{}, unwritable: map[string]bool{},
-		secrets: map[string]map[string]string{}, pods: map[string][]corev1.Pod{}, forwarded: make(chan string, 10)}
+		secrets: map[string]map[string]string{}, pods: map[string][]corev1.Pod{}, forwarded: make(chan string, 10), objects: map[string]any{}}
 	f.server = httptest.NewTLSServer(http.HandlerFunc(f.serve))
 	DeferCleanup(f.server.Close)
 	return f
@@ -261,7 +262,16 @@ func (f *fakeCluster) portForward(w http.ResponseWriter, r *http.Request, pod st
 	}
 }
 
+func (f *fakeCluster) object(path string, object any) {
+	f.objects[path] = object
+}
+
 func (f *fakeCluster) serve(w http.ResponseWriter, r *http.Request) {
+	if object, ok := f.objects[r.URL.Path]; ok {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(object)
+		return
+	}
 	if core, ok := strings.CutPrefix(r.URL.Path, "/api/v1/namespaces/"); ok && !strings.HasSuffix(core, "/log") {
 		parts := strings.Split(core, "/")
 		f.serveCore(w, r, parts[0], parts[1], parts[2:])

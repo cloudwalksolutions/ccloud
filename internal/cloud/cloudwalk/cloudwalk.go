@@ -38,6 +38,12 @@ func Cloud() cloud.Cloud {
 			Secret:  "crunchydb-pguser-crunchydb",
 			Reset:   "db-reset",
 		},
+		Env: cloud.Env{
+			Deployment:    "api-dep",
+			Container:     "api",
+			File:          "src/api/.env",
+			SecretManager: "https://secretmanager.googleapis.com",
+		},
 	}
 }
 
