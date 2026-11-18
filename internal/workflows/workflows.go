@@ -156,14 +156,22 @@ func (r Runs) Rerun(ctx context.Context, run Run) (string, error) {
 			labels[key] = value
 		}
 	}
-	rerun := &unstructured.Unstructured{Object: map[string]any{
+	return r.create(ctx, map[string]any{"generateName": run.Metadata.GenerateName, "labels": labels}, spec)
+}
+
+func (r Runs) Submit(ctx context.Context, template string) (string, error) {
+	return r.create(ctx, map[string]any{"generateName": template + "-"}, map[string]any{"workflowTemplateRef": map[string]any{"name": template}})
+}
+
+func (r Runs) create(ctx context.Context, metadata, spec map[string]any) (string, error) {
+	workflow := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "argoproj.io/v1alpha1",
 		"kind":       "Workflow",
-		"metadata":   map[string]any{"generateName": run.Metadata.GenerateName, "labels": labels},
+		"metadata":   metadata,
 		"spec":       spec,
 	}}
 	var created Run
-	raw, err := r.core.RESTClient().Post().AbsPath(r.path()).Body(rerun).DoRaw(ctx)
+	raw, err := r.core.RESTClient().Post().AbsPath(r.path()).Body(workflow).DoRaw(ctx)
 	if err == nil {
 		err = json.Unmarshal(raw, &created)
 	}

@@ -28,7 +28,7 @@ func RunContext(ctx context.Context, args []string, stdout, stderr io.Writer, ho
 	if asksVersion && checks {
 		root.SetVersionTemplate("ccloud version {{.Version}}\n" + newerRelease(home, running))
 	}
-	root.AddCommand(clustersCmd(home), workflowCmd(home), logsCmd(home), topCmd(home), netCmd(home), appInfoCmd(home), dbCmd(home))
+	root.AddCommand(clustersCmd(home), workflowCmd(home), logsCmd(home), topCmd(home), netCmd(home), appInfoCmd(home), dbCmd(home), envCmd(home))
 	root.SetArgs(args)
 	root.SetOut(stdout)
 	root.SetErr(stderr)

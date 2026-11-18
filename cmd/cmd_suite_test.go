@@ -55,7 +55,8 @@ func exampleCloud() cloud.Cloud {
 			{Name: "north1", Host: "k8s.north1.example.test", Port: 17001},
 			{Name: "south1", Host: "k8s.south1.example.test", Port: 17002},
 		},
-		Database: cloud.Database{Primary: "role=primary", Port: 5432, Secret: "db-owner"},
+		Database: cloud.Database{Primary: "role=primary", Port: 5432, Secret: "db-owner", Reset: "db-reset"},
+		Env:      cloud.Env{Deployment: "web", Container: "server", File: "src/api/.env"},
 	}
 }
 

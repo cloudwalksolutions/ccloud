@@ -54,7 +54,8 @@ func appNamed(home cloud.Cloud, app string) (string, error) {
 		return app, nil
 	}
 	wd, _ := os.Getwd()
-	return repo.App(wd, home.AppDir())
+	_, named, err := repo.App(wd, home.AppDir())
+	return named, err
 }
 
 func regionFor(c *cobra.Command, home cloud.Cloud, name, app, env string) (cloud.Region, error) {

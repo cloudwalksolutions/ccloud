@@ -36,6 +36,13 @@ func Cloud() cloud.Cloud {
 			Primary: "postgres-operator.crunchydata.com/cluster=crunchydb,postgres-operator.crunchydata.com/role=master",
 			Port:    5432,
 			Secret:  "crunchydb-pguser-crunchydb",
+			Reset:   "db-reset",
+		},
+		Env: cloud.Env{
+			Deployment:    "api-dep",
+			Container:     "api",
+			File:          "src/api/.env",
+			SecretManager: "https://secretmanager.googleapis.com",
 		},
 	}
 }

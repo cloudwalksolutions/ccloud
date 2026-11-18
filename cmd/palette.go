@@ -19,11 +19,11 @@ func paletteFor(out io.Writer) palette {
 	return palette(terminal(out))
 }
 
-func terminal(out io.Writer) bool {
+func terminal(stream any) bool {
 	if os.Getenv("CCLOUD_FORCE_TTY") != "" {
 		return true
 	}
-	file, ok := out.(*os.File)
+	file, ok := stream.(*os.File)
 	return ok && term.IsTerminal(int(file.Fd()))
 }
 

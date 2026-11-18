@@ -16,12 +16,21 @@ type Cloud struct {
 	RepoDir      string
 	Releases     string
 	Database     Database
+	Env          Env
 }
 
 type Database struct {
 	Primary string
 	Port    int
 	Secret  string
+	Reset   string
+}
+
+type Env struct {
+	Deployment    string
+	Container     string
+	File          string
+	SecretManager string
 }
 
 func (c Cloud) AppDir() string {
