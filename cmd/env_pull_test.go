@@ -163,12 +163,33 @@ var _ = Describe("ccloud env pull", func() {
 			})
 		})
 
-		It("sends you to sign in to Google when you have no application default credentials", func() {
-			tool("gcloud", `echo "ERROR: (gcloud.auth.application-default.print-access-token) Your default credentials were not found." >&2; exit 1`)
+		It("signs you in to Google when it has no credentials for you, then pulls", func() {
+			tool("gcloud", `case "$*" in
+  "auth application-default login") : > "$0.signed-in"; echo "Credentials saved." ;;
+  *) [ -f "$0.signed-in" ] && echo adc-token || { echo "Your default credentials were not found." >&2; exit 1; } ;;
+esac`)
+
+			Expect(run("env", "pull")).To(Succeed())
+
+			Expect(out.String()).To(HavePrefix("Signing you in to Google to read acme's secrets.\nCredentials saved.\nsrc/api/.env, from acme's feat-x in north1:\n"))
+			Expect(envFile()).To(HavePrefix("STRIPE_KEY=sk_test_123\n"))
+		})
+
+		It("stops rather than signing you in again when Google still refuses you after signing in", func() {
+			tool("gcloud", `[ "$*" = "auth application-default login" ] && exit 0; echo stale-token`)
 
 			err := run("env", "pull")
 
-			Expect(err).To(MatchError("reading acme's secrets needs your Google sign-in; run gcloud auth application-default login"))
+			Expect(err).To(MatchError("your Google sign-in was refused for acme's secrets, so nothing was pulled"))
+		})
+
+		It("writes nothing when you do not finish signing in to Google", func() {
+			tool("gcloud", `[ "$*" = "auth application-default login" ] && { echo "Aborted by user." >&2; exit 1; }; exit 1`)
+
+			err := run("env", "pull")
+
+			Expect(err).To(MatchError("signing in to Google failed, so nothing was pulled"))
+			Expect(filepath.Join(repo, "src", "api", ".env")).NotTo(BeAnExistingFile())
 		})
 
 		It("names the secrets you may not read, and writes none, when you are not one of the app's developers", func() {
@@ -258,6 +279,16 @@ var _ = Describe("ccloud env pull", func() {
 
 			Expect(envFile()).To(Equal("# local\nDB_HOST=localhost\nSECRET_KEY=\"has space #hash\"\nSTRIPE_KEY=sk_test_123\n"))
 			Expect(out.String()).To(Equal("src/api/.env, from acme's feat-x in north1:\n  added    STRIPE_KEY\n1 unchanged.\n"))
+		})
+
+		It("colors what it added green and what it changed yellow, when asked to, as on a terminal", func() {
+			GinkgoT().Setenv("CLICOLOR_FORCE", "1")
+			writeEnvFile("STRIPE_KEY=sk_live_999\n")
+
+			Expect(run("env", "pull", "--force")).To(Succeed())
+
+			Expect(out.String()).To(ContainSubstring("  \x1b[32madded  \x1b[0m  SECRET_KEY\n"))
+			Expect(out.String()).To(ContainSubstring("  \x1b[33mchanged\x1b[0m  STRIPE_KEY\n"))
 		})
 
 		It("says your env file already matches when it has every value", func() {
