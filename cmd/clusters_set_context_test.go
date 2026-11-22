@@ -55,26 +55,26 @@ var _ = Describe("ccloud clusters set-context", func() {
 	})
 
 	It("switches you to a region you signed in to, keeping the namespace you last chose there", func() {
-		write("apiVersion: v1\nkind: Config\ncurrent-context: work\ncontexts:\n- name: work\n  context: {cluster: work, user: work}\n- name: ccloud-north1\n  context: {cluster: ccloud-north1, user: ccloud-north1, namespace: stage-shop}\n")
+		write("apiVersion: v1\nkind: Config\ncurrent-context: work\ncontexts:\n- name: work\n  context: {cluster: work, user: work}\n- name: ccloud-north1\n  context: {cluster: ccloud-north1, user: ccloud-north1, namespace: stage-acme}\n")
 
 		Expect(cmd.Run([]string{"clusters", "set-context", "-r", "north1"}, out, out, example, "dev")).To(Succeed())
 
 		cfg, err := clientcmd.LoadFromFile(kubeconfig)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cfg.CurrentContext).To(Equal("ccloud-north1"))
-		Expect(cfg.Contexts["ccloud-north1"].Namespace).To(Equal("stage-shop"))
+		Expect(cfg.Contexts["ccloud-north1"].Namespace).To(Equal("stage-acme"))
 		Expect(out.String()).To(ContainSubstring(`Switched to context "ccloud-north1".`))
 	})
 
 	It("points the region's context at the namespace you name", func() {
-		write("apiVersion: v1\nkind: Config\ncurrent-context: work\ncontexts:\n- name: work\n  context: {cluster: work, user: work, namespace: default}\n- name: ccloud-north1\n  context: {cluster: ccloud-north1, user: ccloud-north1, namespace: stage-shop}\n")
+		write("apiVersion: v1\nkind: Config\ncurrent-context: work\ncontexts:\n- name: work\n  context: {cluster: work, user: work, namespace: default}\n- name: ccloud-north1\n  context: {cluster: ccloud-north1, user: ccloud-north1, namespace: stage-acme}\n")
 
-		Expect(cmd.Run([]string{"clusters", "set-context", "--region", "north1", "--namespace", "ci-shop"}, out, out, example, "dev")).To(Succeed())
+		Expect(cmd.Run([]string{"clusters", "set-context", "--region", "north1", "--namespace", "ci-acme"}, out, out, example, "dev")).To(Succeed())
 
 		cfg, err := clientcmd.LoadFromFile(kubeconfig)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cfg.CurrentContext).To(Equal("ccloud-north1"))
-		Expect(cfg.Contexts["ccloud-north1"].Namespace).To(Equal("ci-shop"))
+		Expect(cfg.Contexts["ccloud-north1"].Namespace).To(Equal("ci-acme"))
 		Expect(cfg.Contexts["work"].Namespace).To(Equal("default"))
 	})
 })

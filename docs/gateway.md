@@ -12,7 +12,7 @@ Query: `namespace` (one or more, required), `start`, `end` (RFC 3339), `limit` (
 `regex`, `level` (`error` or `warn`).
 
 ```json
-{"entries": [{"time": "2026-10-26T07:33:21Z", "namespace": "prod-shop", "pod": "api-7f9c", "container": "api",
+{"entries": [{"time": "2026-10-26T07:33:21Z", "namespace": "prod-acme", "pod": "api-7f9c", "container": "api",
   "stream": "stderr", "level": "error", "line": "db query failed"}], "truncated": false}
 ```
 
@@ -42,7 +42,7 @@ or another reason. 429 when the caller already follows as many streams as the ga
 The environments this region hosts for the app that the caller may read.
 
 ```json
-{"environments": [{"name": "ci", "namespace": "ci-shop"}, {"name": "prod", "namespace": "prod-shop", "url": "https://shop.example"}]}
+{"environments": [{"name": "ci", "namespace": "ci-acme"}, {"name": "prod", "namespace": "prod-acme", "url": "https://acme.example"}]}
 ```
 
 `url` is absent when the environment serves nothing. An empty list means this region hosts none the
@@ -54,7 +54,7 @@ Query: `env` (optional, one environment). What each container of those environme
 pressure on the nodes they run on. Raw numbers; the client decides what to flag.
 
 ```json
-{"environments": [{"name": "prod", "namespace": "prod-shop",
+{"environments": [{"name": "prod", "namespace": "prod-acme",
   "containers": [{"pod": "api-7f9c", "container": "api", "node": "node02",
     "cpu": {"used": 0.31, "request": 0.25, "limit": 1}, "memory": {"used": 412000000, "limit": 1073741824},
     "throttled": 0.02, "restarts": 0, "oomKills": 0}],
@@ -87,7 +87,7 @@ caller who may not read it.
 
 ```json
 {"pulls": [{"number": 105, "title": "Search by lake", "author": "dev", "branch": "feat/BOAT-105/search",
-   "openedHoursAgo": 72, "draft": false, "reviewed": true, "environment": "https://boat-105.shop.dev",
+   "openedHoursAgo": 72, "draft": false, "reviewed": true, "environment": "https://boat-105.acme.dev",
    "checks": [{"flow": "api-tests", "status": "Succeeded", "run": "api-tests-x1"}]}],
  "flow": {"merged": 2, "openToMergeHours": 12, "firstReviewHours": 1.5},
  "delivery": {"deploys": 1, "mergeToProdHours": 1},

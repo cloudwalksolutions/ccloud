@@ -31,7 +31,7 @@ the namespace kubectl uses there.
 An app repo names its app in `.ccloud/app.yaml` (CloudWalk's repos use `.cloudwalk/app.yaml`):
 
 ```yaml
-app: shop
+app: acme
 ```
 
 Anywhere inside the repo, `--app` defaults to it, and the region is found for you: ccloud asks each

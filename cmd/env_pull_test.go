@@ -71,7 +71,7 @@ var _ = Describe("ccloud env pull", func() {
 
 	DescribeTable("copies only a feature environment, whose secrets come from the dev project",
 		func(env string) {
-			in(shopRepo())
+			in(acmeRepo())
 
 			err := run("env", "pull", "-e", env, "-r", "north1")
 
@@ -83,20 +83,20 @@ var _ = Describe("ccloud env pull", func() {
 	)
 
 	It("says so when no feature environment is running to copy", func() {
-		in(shopRepo())
+		in(acmeRepo())
 
 		err := run("env", "pull")
 
-		Expect(err).To(MatchError("no feature environment of shop is running to copy; open a pull request, or name one with -e"))
+		Expect(err).To(MatchError("no feature environment of acme is running to copy; open a pull request, or name one with -e"))
 	})
 
 	It("asks which feature environment to copy when several are running", func() {
 		north.hosts = []string{"ci", "feat-a", "feat-b"}
-		in(shopRepo())
+		in(acmeRepo())
 
 		err := run("env", "pull")
 
-		Expect(err).To(MatchError("shop has 2 feature environments running, feat-a and feat-b; name the one to copy with -e"))
+		Expect(err).To(MatchError("acme has 2 feature environments running, feat-a and feat-b; name the one to copy with -e"))
 	})
 
 	Context("with a feature environment running", func() {
@@ -119,11 +119,11 @@ var _ = Describe("ccloud env pull", func() {
 
 		BeforeEach(func() {
 			north.hosts = []string{"ci", "stage", "feat-x"}
-			repo = shopRepo()
+			repo = acmeRepo()
 			in(repo)
 			secrets = &fakeSecretManager{values: map[string]string{
-				"shop-dev/nonprod-stripe-key": "sk_test_123",
-				"shop-dev/nonprod-secret-key": "has space #hash",
+				"acme-dev/nonprod-stripe-key": "sk_test_123",
+				"acme-dev/nonprod-secret-key": "has space #hash",
 			}}
 			server := httptest.NewServer(http.HandlerFunc(secrets.serve))
 			DeferCleanup(server.Close)
@@ -132,7 +132,7 @@ var _ = Describe("ccloud env pull", func() {
 
 			cluster = newFakeCluster()
 			cluster.signIn("north1")
-			cluster.object("/apis/apps/v1/namespaces/feat-x-shop/deployments/web", map[string]any{
+			cluster.object("/apis/apps/v1/namespaces/feat-x-acme/deployments/web", map[string]any{
 				"apiVersion": "apps/v1", "kind": "Deployment", "metadata": map[string]any{"name": "web"},
 				"spec": map[string]any{"template": map[string]any{"spec": map[string]any{"containers": []any{
 					map[string]any{"name": "sidecar", "env": []any{secretEnv("SIDECAR_KEY", "app-secrets", "stripe-key")}},
@@ -144,7 +144,7 @@ var _ = Describe("ccloud env pull", func() {
 					}},
 				}}}},
 			})
-			cluster.object("/apis/external-secrets.io/v1/namespaces/feat-x-shop/externalsecrets", map[string]any{
+			cluster.object("/apis/external-secrets.io/v1/namespaces/feat-x-acme/externalsecrets", map[string]any{
 				"apiVersion": "external-secrets.io/v1", "kind": "ExternalSecretList", "items": []any{map[string]any{
 					"metadata": map[string]any{"name": "app-secrets"},
 					"spec": map[string]any{
@@ -157,9 +157,9 @@ var _ = Describe("ccloud env pull", func() {
 					},
 				}},
 			})
-			cluster.object("/apis/external-secrets.io/v1/namespaces/feat-x-shop/secretstores/secret-store", map[string]any{
+			cluster.object("/apis/external-secrets.io/v1/namespaces/feat-x-acme/secretstores/secret-store", map[string]any{
 				"apiVersion": "external-secrets.io/v1", "kind": "SecretStore", "metadata": map[string]any{"name": "secret-store"},
-				"spec": map[string]any{"provider": map[string]any{"gcpsm": map[string]any{"projectID": "shop-dev"}}},
+				"spec": map[string]any{"provider": map[string]any{"gcpsm": map[string]any{"projectID": "acme-dev"}}},
 			})
 		})
 
@@ -168,24 +168,24 @@ var _ = Describe("ccloud env pull", func() {
 
 			err := run("env", "pull")
 
-			Expect(err).To(MatchError("reading shop's secrets needs your Google sign-in; run gcloud auth application-default login"))
+			Expect(err).To(MatchError("reading acme's secrets needs your Google sign-in; run gcloud auth application-default login"))
 		})
 
 		It("names the secrets you may not read, and writes none, when you are not one of the app's developers", func() {
-			secrets.refused = map[string]bool{"shop-dev/nonprod-stripe-key": true}
+			secrets.refused = map[string]bool{"acme-dev/nonprod-stripe-key": true}
 
 			err := run("env", "pull")
 
-			Expect(err).To(MatchError("you may not read shop's nonprod-stripe-key in shop-dev; ask to be added to shop's developers"))
+			Expect(err).To(MatchError("you may not read acme's nonprod-stripe-key in acme-dev; ask to be added to acme's developers"))
 			Expect(filepath.Join(repo, "src", "api", ".env")).NotTo(BeAnExistingFile())
 		})
 
 		It("names a secret the environment expects that its project lacks", func() {
-			delete(secrets.values, "shop-dev/nonprod-secret-key")
+			delete(secrets.values, "acme-dev/nonprod-secret-key")
 
 			err := run("env", "pull")
 
-			Expect(err).To(MatchError("reading nonprod-secret-key from shop-dev: secret manager answered 404"))
+			Expect(err).To(MatchError("reading nonprod-secret-key from acme-dev: secret manager answered 404"))
 		})
 
 		It("says so when Secret Manager cannot be reached", func() {
@@ -193,7 +193,7 @@ var _ = Describe("ccloud env pull", func() {
 
 			err := run("env", "pull")
 
-			Expect(err).To(MatchError(ContainSubstring("reading nonprod-stripe-key from shop-dev: ")))
+			Expect(err).To(MatchError(ContainSubstring("reading nonprod-stripe-key from acme-dev: ")))
 		})
 
 		It("copies the feature environment you name, wherever it runs", func() {
@@ -201,7 +201,7 @@ var _ = Describe("ccloud env pull", func() {
 
 			Expect(run("env", "pull", "-e", "feat-x")).To(Succeed())
 
-			Expect(out.String()).To(HavePrefix("src/api/.env, from shop's feat-x in north1:\n"))
+			Expect(out.String()).To(HavePrefix("src/api/.env, from acme's feat-x in north1:\n"))
 		})
 
 		It("sends you to sign in to the region running the environment", func() {
@@ -213,11 +213,11 @@ var _ = Describe("ccloud env pull", func() {
 		It("says so when the environment runs no API to copy", func() {
 			err := run("env", "pull", "-e", "feat-z", "-r", "north1")
 
-			Expect(err).To(MatchError("shop's feat-z in north1 runs no web to copy"))
+			Expect(err).To(MatchError("acme's feat-z in north1 runs no web to copy"))
 		})
 
 		It("names the secret store it could not find, rather than blaming the API", func() {
-			delete(cluster.objects, "/apis/external-secrets.io/v1/namespaces/feat-x-shop/secretstores/secret-store")
+			delete(cluster.objects, "/apis/external-secrets.io/v1/namespaces/feat-x-acme/secretstores/secret-store")
 
 			err := run("env", "pull")
 
@@ -229,14 +229,14 @@ var _ = Describe("ccloud env pull", func() {
 
 			err := run("env", "pull")
 
-			Expect(err).To(MatchError(HavePrefix("asking south1 where shop runs")))
+			Expect(err).To(MatchError(HavePrefix("asking south1 where acme runs")))
 		})
 
 		It("writes the secrets the environment's API gets, under the names it gets them, into a new env file", func() {
 			Expect(run("env", "pull")).To(Succeed())
 
 			Expect(envFile()).To(Equal("STRIPE_KEY=sk_test_123\nSECRET_KEY=\"has space #hash\"\n"))
-			Expect(out.String()).To(Equal("src/api/.env, from shop's feat-x in north1:\n  added    STRIPE_KEY\n  added    SECRET_KEY\n"))
+			Expect(out.String()).To(Equal("src/api/.env, from acme's feat-x in north1:\n  added    STRIPE_KEY\n  added    SECRET_KEY\n"))
 		})
 
 		It("writes to the env file you name, from the repo's root, when your API reads another", func() {
@@ -248,7 +248,7 @@ var _ = Describe("ccloud env pull", func() {
 			written, err := os.ReadFile(filepath.Join(repo, "server", ".env.local"))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(written)).To(HavePrefix("STRIPE_KEY=sk_test_123\n"))
-			Expect(out.String()).To(HavePrefix("server/.env.local, from shop's feat-x in north1:\n"))
+			Expect(out.String()).To(HavePrefix("server/.env.local, from acme's feat-x in north1:\n"))
 		})
 
 		It("adds only what your env file lacks, leaving your own settings and notes as they are", func() {
@@ -257,7 +257,7 @@ var _ = Describe("ccloud env pull", func() {
 			Expect(run("env", "pull")).To(Succeed())
 
 			Expect(envFile()).To(Equal("# local\nDB_HOST=localhost\nSECRET_KEY=\"has space #hash\"\nSTRIPE_KEY=sk_test_123\n"))
-			Expect(out.String()).To(Equal("src/api/.env, from shop's feat-x in north1:\n  added    STRIPE_KEY\n1 unchanged.\n"))
+			Expect(out.String()).To(Equal("src/api/.env, from acme's feat-x in north1:\n  added    STRIPE_KEY\n1 unchanged.\n"))
 		})
 
 		It("says your env file already matches when it has every value", func() {
@@ -265,7 +265,7 @@ var _ = Describe("ccloud env pull", func() {
 
 			Expect(run("env", "pull")).To(Succeed())
 
-			Expect(out.String()).To(Equal("src/api/.env already matches shop's feat-x in north1.\n"))
+			Expect(out.String()).To(Equal("src/api/.env already matches acme's feat-x in north1.\n"))
 		})
 
 		It("starts its additions on their own line when your file's last line has no newline", func() {
@@ -281,7 +281,7 @@ var _ = Describe("ccloud env pull", func() {
 
 			err := run("env", "pull")
 
-			Expect(err).To(MatchError("src/api/.env differs from shop's feat-x; pass --force to replace:\n  STRIPE_KEY  sk_l… → sk_t…"))
+			Expect(err).To(MatchError("src/api/.env differs from acme's feat-x; pass --force to replace:\n  STRIPE_KEY  sk_l… → sk_t…"))
 			Expect(envFile()).To(Equal("STRIPE_KEY=sk_live_999\n"))
 		})
 
@@ -291,7 +291,7 @@ var _ = Describe("ccloud env pull", func() {
 			Expect(run("env", "pull", "--force")).To(Succeed())
 
 			Expect(envFile()).To(Equal("# mine\nSTRIPE_KEY=sk_test_123\nOTHER=1\nSECRET_KEY=\"has space #hash\"\n"))
-			Expect(out.String()).To(Equal("src/api/.env, from shop's feat-x in north1:\n  added    SECRET_KEY\n  changed  STRIPE_KEY\n"))
+			Expect(out.String()).To(Equal("src/api/.env, from acme's feat-x in north1:\n  added    SECRET_KEY\n  changed  STRIPE_KEY\n"))
 		})
 	})
 })
@@ -321,9 +321,9 @@ func (m *fakeSecretManager) serve(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func shopRepo() string {
+func acmeRepo() string {
 	root := GinkgoT().TempDir()
 	Expect(os.MkdirAll(filepath.Join(root, ".ccloud"), 0o755)).To(Succeed())
-	Expect(os.WriteFile(filepath.Join(root, ".ccloud", "app.yaml"), []byte("app: shop\n"), 0o600)).To(Succeed())
+	Expect(os.WriteFile(filepath.Join(root, ".ccloud", "app.yaml"), []byte("app: acme\n"), 0o600)).To(Succeed())
 	return root
 }

@@ -74,7 +74,7 @@ func (g *fakeGateway) serve(w http.ResponseWriter, r *http.Request) {
 		defer g.after(len(g.asked))
 	}
 	if g.refuse != 0 {
-		http.Error(w, "dev@example.test may not read logs in prod-shop", g.refuse)
+		http.Error(w, "dev@example.test may not read logs in prod-acme", g.refuse)
 		return
 	}
 	if r.URL.Path == "/v1/logs/stream" {
@@ -132,7 +132,7 @@ var _ = Describe("ccloud logs", func() {
 	})
 
 	It("asks which of the app's environments to read", func() {
-		err := run("logs", "-a", "shop", "-r", "north1")
+		err := run("logs", "-a", "acme", "-r", "north1")
 
 		Expect(err).To(MatchError(ContainSubstring("which environment? ccloud logs --env <env>")))
 	})
@@ -142,7 +142,7 @@ var _ = Describe("ccloud logs", func() {
 			{"time":"2026-10-26T07:33:21Z","pod":"api-7f9c","line":"{\"level\":\"error\",\"msg\":\"db query failed\",\"table\":\"orders\",\"attempt\":3}"},
 			{"time":"2026-10-26T07:33:22Z","pod":"web-5d2a","line":"POST /checkout 500"}]}`}
 
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1")).To(Succeed())
 
 		Expect(lines(out)[0]).To(HaveSuffix(" api-7f9c ERROR db query failed attempt=3 table=orders"))
 		Expect(lines(out)[1]).To(HaveSuffix(" web-5d2a POST /checkout 500"))
@@ -155,7 +155,7 @@ var _ = Describe("ccloud logs", func() {
 			{"time":"2026-10-26T07:33:21Z","pod":"api","line":"{\"level\":\"warn\",\"msg\":\"b\"}"},
 			{"time":"2026-10-26T07:33:21Z","pod":"api","line":"{\"level\":\"info\",\"msg\":\"c\"}"}]}`}
 
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1")).To(Succeed())
 
 		Expect(out.String()).To(ContainSubstring("\x1b[31mERROR\x1b[0m a"))
 		Expect(out.String()).To(ContainSubstring("\x1b[33mWARN\x1b[0m b"))
@@ -163,16 +163,16 @@ var _ = Describe("ccloud logs", func() {
 	})
 
 	It("prints lines exactly as stored with -o raw, and with -o json one entry per line then where to resume", func() {
-		entries := `{"entries":[{"time":"2026-10-26T07:33:21Z","namespace":"prod-shop","pod":"api-7f9c","container":"api","stream":"stderr","level":"error","line":"{\"level\":\"error\",\"msg\":\"boom\"}"}]}`
+		entries := `{"entries":[{"time":"2026-10-26T07:33:21Z","namespace":"prod-acme","pod":"api-7f9c","container":"api","stream":"stderr","level":"error","line":"{\"level\":\"error\",\"msg\":\"boom\"}"}]}`
 		gateway.answers = []string{entries, entries}
 
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1", "-o", "raw")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1", "-o", "raw")).To(Succeed())
 		Expect(out.String()).To(Equal(`{"level":"error","msg":"boom"}` + "\n"))
 
 		out.Reset()
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1", "-o", "json")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1", "-o", "json")).To(Succeed())
 		Expect(lines(out)).To(HaveExactElements(
-			MatchJSON(`{"time":"2026-10-26T07:33:21Z","namespace":"prod-shop","pod":"api-7f9c","container":"api","stream":"stderr","level":"error","line":"{\"level\":\"error\",\"msg\":\"boom\"}"}`),
+			MatchJSON(`{"time":"2026-10-26T07:33:21Z","namespace":"prod-acme","pod":"api-7f9c","container":"api","stream":"stderr","level":"error","line":"{\"level\":\"error\",\"msg\":\"boom\"}"}`),
 			MatchJSON(`{"next":"2026-10-26T07:33:21.000000001Z"}`),
 		))
 	})
@@ -191,7 +191,7 @@ var _ = Describe("ccloud logs", func() {
 			}
 		}
 
-		Expect(cmd.RunContext(ctx, []string{"logs", "-a", "shop", "-e", "prod", "-r", "north1", "-f", "-c", "api"}, out, out, home, "dev")).To(Succeed())
+		Expect(cmd.RunContext(ctx, []string{"logs", "-a", "acme", "-e", "prod", "-r", "north1", "-f", "-c", "api"}, out, out, home, "dev")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements(HaveSuffix("api-7f9c first"), HaveSuffix("api-7f9c second"), HaveSuffix("api-7f9c third")))
 		streamed := gateway.asked[1].URL
@@ -205,7 +205,7 @@ var _ = Describe("ccloud logs", func() {
 
 	Context("following", func() {
 		follow := func(ctx context.Context, extra ...string) error {
-			return cmd.RunContext(ctx, append([]string{"logs", "-a", "shop", "-e", "prod", "-r", "north1", "-f"}, extra...), out, out, home, "dev")
+			return cmd.RunContext(ctx, append([]string{"logs", "-a", "acme", "-e", "prod", "-r", "north1", "-f"}, extra...), out, out, home, "dev")
 		}
 		line := `{"time":"2026-10-26T07:33:22Z","pod":"api-7f9c","container":"api","line":"ERR boom"}` + "\n"
 
@@ -219,7 +219,7 @@ var _ = Describe("ccloud logs", func() {
 		It("stops when the gateway says you may no longer read the environment", func(ctx SpecContext) {
 			gateway.streams = []reply{{body: `{"end":"access revoked"}` + "\n"}}
 
-			Expect(follow(ctx)).To(MatchError("you may no longer read shop's prod logs in north1"))
+			Expect(follow(ctx)).To(MatchError("you may no longer read acme's prod logs in north1"))
 		}, SpecTimeout(5*time.Second))
 
 		It("signs in again once when the gateway stops accepting your token, then gives up", func(ctx SpecContext) {
@@ -260,8 +260,8 @@ var _ = Describe("ccloud logs", func() {
 	})
 
 	It("reads a window you name, from a time and until a time or a while ago", func() {
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1", "--since-time", "2026-10-26T07:00:00Z", "--until", "2026-10-26T08:00:00Z")).To(Succeed())
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1", "--until", "10m")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1", "--since-time", "2026-10-26T07:00:00Z", "--until", "2026-10-26T08:00:00Z")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1", "--until", "10m")).To(Succeed())
 
 		Expect(gateway.asked[0].URL.Query().Get("start")).To(Equal("2026-10-26T07:00:00Z"))
 		Expect(gateway.asked[0].URL.Query().Get("end")).To(Equal("2026-10-26T08:00:00Z"))
@@ -271,36 +271,36 @@ var _ = Describe("ccloud logs", func() {
 	It("fails when any line matched, when asked to, so a script can act on it", func() {
 		gateway.answers = []string{`{"entries":[{"time":"2026-10-26T07:33:21Z","pod":"api-7f9c","container":"api","line":"ERR boom"}]}`, `{"entries":[]}`}
 
-		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1", "-l", "error", "--fail-on-match")
+		err := run("logs", "-a", "acme", "-e", "prod", "-r", "north1", "-l", "error", "--fail-on-match")
 		Expect(err).To(MatchError("1 line matched"))
 		Expect(lines(out)).To(HaveExactElements(HaveSuffix("api api-7f9c ERR boom")))
 
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1", "-l", "error", "--fail-on-match")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1", "-l", "error", "--fail-on-match")).To(Succeed())
 	})
 
 	It("lists the containers an environment has logged, to pick from with -c", func() {
-		Expect(run("logs", "containers", "-a", "shop", "-e", "prod", "-r", "north1")).To(Succeed())
+		Expect(run("logs", "containers", "-a", "acme", "-e", "prod", "-r", "north1")).To(Succeed())
 
 		Expect(out.String()).To(Equal("api\nnginx\n"))
-		Expect(gateway.asked[0].URL.Query()["namespace"]).To(Equal([]string{"prod-shop"}))
+		Expect(gateway.asked[0].URL.Query()["namespace"]).To(Equal([]string{"prod-acme"}))
 		Expect(time.Parse(time.RFC3339, gateway.asked[0].URL.Query().Get("start"))).To(BeTemporally("~", time.Now().Add(-24*time.Hour), 5*time.Second))
 	})
 
 	It("refuses an end it cannot read", func() {
-		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1", "--until", "yesterday")
+		err := run("logs", "-a", "acme", "-e", "prod", "-r", "north1", "--until", "yesterday")
 
 		Expect(err).To(MatchError(`--until is a time like 2026-10-26T08:00:00Z or a while ago like 10m, not "yesterday"`))
 	})
 
 	It("refuses an output it cannot write, rather than guessing", func() {
-		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1", "-o", "yaml")
+		err := run("logs", "-a", "acme", "-e", "prod", "-r", "north1", "-o", "yaml")
 
 		Expect(err).To(MatchError(`output is pretty, raw or json, not "yaml"`))
 		Expect(gateway.asked).To(BeEmpty())
 	})
 
 	It("narrows by time, pod, container, text, pattern and level, and reads as many lines as asked", func() {
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1",
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1",
 			"--since", "6h", "--tail", "50", "--pod", "api-", "-c", "api", "-c", "nginx", "-g", "checkout", "-E", "5[0-9]{2}", "-l", "error")).To(Succeed())
 
 		query := gateway.asked[0].URL.Query()
@@ -316,9 +316,9 @@ var _ = Describe("ccloud logs", func() {
 	It("says so when the cluster does not let you read that environment's logs", func() {
 		gateway.refuse = http.StatusForbidden
 
-		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
+		err := run("logs", "-a", "acme", "-e", "prod", "-r", "north1")
 
-		Expect(err).To(MatchError("you may not read shop's prod logs in north1: dev@example.test may not read logs in prod-shop"))
+		Expect(err).To(MatchError("you may not read acme's prod logs in north1: dev@example.test may not read logs in prod-acme"))
 	})
 
 	It("signs you in to Access first when you have no session for the region yet, never printing the token", func() {
@@ -332,7 +332,7 @@ var _ = Describe("ccloud logs", func() {
   "access token") [ -f `+session+` ] && echo access-jwt || { echo "Unable to find token" >&2; exit 1; } ;;
 esac`)
 
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1")).To(Succeed())
 
 		Expect(out.String()).NotTo(ContainSubstring("access-jwt"))
 		Expect(os.ReadFile(session)).To(Equal([]byte(home.Regions[0].Gateway + "\n")))
@@ -343,7 +343,7 @@ esac`)
 	It("names a gateway address in the cloud's definition that is not a URL", func() {
 		home.Regions[0].Gateway = "https://api north1"
 
-		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
+		err := run("logs", "-a", "acme", "-e", "prod", "-r", "north1")
 
 		Expect(err).To(MatchError(HavePrefix(`north1's gateway "https://api north1" is not a URL: `)))
 	})
@@ -351,7 +351,7 @@ esac`)
 	It("says so when something other than the gateway answers, such as Access's login page", func() {
 		gateway.answers = []string{"<!DOCTYPE html><title>Sign in ・ Cloudflare Access</title>"}
 
-		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
+		err := run("logs", "-a", "acme", "-e", "prod", "-r", "north1")
 
 		Expect(err).To(MatchError(HavePrefix("the gateway answered something other than logs")))
 	})
@@ -363,7 +363,7 @@ esac`)
 		interrupted, interrupt := context.WithCancel(ctx)
 		time.AfterFunc(100*time.Millisecond, interrupt)
 
-		Expect(cmd.RunContext(interrupted, []string{"logs", "-a", "shop", "-e", "prod", "-r", "north1"}, out, out, home, "dev")).To(Succeed())
+		Expect(cmd.RunContext(interrupted, []string{"logs", "-a", "acme", "-e", "prod", "-r", "north1"}, out, out, home, "dev")).To(Succeed())
 
 		Expect(gateway.asked).To(BeEmpty())
 	}, SpecTimeout(3*time.Second))
@@ -373,7 +373,7 @@ esac`)
 		GinkgoT().Setenv("PATH", bin)
 		tool(bin, "cloudflared", `echo "Unable to reach the login page" >&2; exit 1`)
 
-		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
+		err := run("logs", "-a", "acme", "-e", "prod", "-r", "north1")
 
 		Expect(err).To(MatchError(HavePrefix("signing in to " + home.Regions[0].Gateway + " through Cloudflare Access")))
 		Expect(out.String()).To(ContainSubstring("Unable to reach the login page"))
@@ -383,9 +383,9 @@ esac`)
 	It("names the gateway and what it answered when it cannot serve logs", func() {
 		gateway.refuse = http.StatusBadGateway
 
-		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
+		err := run("logs", "-a", "acme", "-e", "prod", "-r", "north1")
 
-		Expect(err).To(MatchError("the gateway answered 502 Bad Gateway: dev@example.test may not read logs in prod-shop"))
+		Expect(err).To(MatchError("the gateway answered 502 Bad Gateway: dev@example.test may not read logs in prod-acme"))
 	})
 
 	It("shows why the cloud's issuer would not sign you in, and asks the gateway nothing", func() {
@@ -394,7 +394,7 @@ esac`)
 		tool(bin, "cloudflared", `echo access-jwt`)
 		tool(bin, "kubectl-oidc_login", `echo "oauth2: invalid_grant" >&2; exit 1`)
 
-		err := run("logs", "-a", "shop", "-e", "prod", "-r", "north1")
+		err := run("logs", "-a", "acme", "-e", "prod", "-r", "north1")
 
 		Expect(err).To(MatchError("signing in to " + home.Issuer + " failed"))
 		Expect(out.String()).To(ContainSubstring("oauth2: invalid_grant"))
@@ -404,10 +404,10 @@ esac`)
 	It("reads the environment's last hour as you, through Access, oldest line first", func() {
 		at := time.Date(2026, 10, 26, 7, 33, 21, 0, time.UTC)
 		gateway.answers = []string{`{"entries":[
-			{"time":"2026-10-26T07:33:21Z","namespace":"prod-shop","pod":"api-7f9c","container":"api","line":"db query failed"},
-			{"time":"2026-10-26T07:33:22Z","namespace":"prod-shop","pod":"web-5d2a","container":"web","line":"POST /checkout 500"}]}`}
+			{"time":"2026-10-26T07:33:21Z","namespace":"prod-acme","pod":"api-7f9c","container":"api","line":"db query failed"},
+			{"time":"2026-10-26T07:33:22Z","namespace":"prod-acme","pod":"web-5d2a","container":"web","line":"POST /checkout 500"}]}`}
 
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1")).To(Succeed())
 
 		Expect(gateway.asked).To(HaveLen(1))
 		asked := gateway.asked[0]
@@ -415,7 +415,7 @@ esac`)
 		Expect(asked.Header.Get("cf-access-token")).To(Equal("access-jwt"))
 		Expect(asked.Header.Get("Authorization")).To(Equal("Bearer id-token"))
 		query := asked.URL.Query()
-		Expect(query["namespace"]).To(Equal([]string{"prod-shop"}))
+		Expect(query["namespace"]).To(Equal([]string{"prod-acme"}))
 		Expect(query.Get("limit")).To(Equal("200"))
 		Expect(query.Get("direction")).To(Equal("backward"))
 		Expect(time.Parse(time.RFC3339, query.Get("start"))).To(BeTemporally("~", time.Now().Add(-time.Hour), 5*time.Second))
@@ -428,7 +428,7 @@ esac`)
 	It("indents the rest of a line that runs over several, such as a stack trace, under its first", func() {
 		gateway.answers = []string{`{"entries":[{"time":"2026-10-26T07:33:21Z","pod":"api-7f9c","container":"api","line":"panic: boom\ngoroutine 1:\n\tmain.go:12\n"}]}`}
 
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements(
 			HaveSuffix(" api api-7f9c panic: boom"),
@@ -440,7 +440,7 @@ esac`)
 	It("says when it showed only the newest lines, so you know there were more", func() {
 		gateway.answers = []string{`{"entries":[{"time":"2026-10-26T07:33:21Z","pod":"api-7f9c","container":"api","line":"ready"}],"truncated":true}`}
 
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1", "--tail", "1")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1", "--tail", "1")).To(Succeed())
 
 		Expect(lines(out)[1]).To(Equal("Showed the newest 1 lines; raise --tail or narrow --since or --until for more."))
 	})
@@ -449,7 +449,7 @@ esac`)
 		now := time.Now().Truncate(time.Millisecond)
 		gateway.answers = []string{`{"entries":[{"time":"` + now.UTC().Format(time.RFC3339Nano) + `","pod":"api-7f9c","container":"api","line":"ready"}]}`}
 
-		Expect(run("logs", "-a", "shop", "-e", "prod", "-r", "north1")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements(now.Local().Format("15:04:05.000") + " api api-7f9c ready"))
 	})

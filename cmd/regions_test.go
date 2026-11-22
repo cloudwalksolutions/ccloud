@@ -52,34 +52,34 @@ var _ = Describe("finding the region", func() {
 	})
 
 	It("names the environments the app has when no region hosts the one asked for", func() {
-		err := run("logs", "-a", "shop", "-e", "feat-search")
+		err := run("logs", "-a", "acme", "-e", "feat-search")
 
-		Expect(err).To(MatchError("no region hosts shop's feat-search; it has ci (north1), prod (south1), stage (south1)"))
+		Expect(err).To(MatchError("no region hosts acme's feat-search; it has ci (north1), prod (south1), stage (south1)"))
 	})
 
 	It("reads an environment's logs from the region that hosts it", func() {
-		Expect(run("logs", "-a", "shop", "-e", "prod")).To(Succeed())
+		Expect(run("logs", "-a", "acme", "-e", "prod")).To(Succeed())
 
 		Expect(north.asked).To(BeEmpty())
 		Expect(south.asked).To(HaveLen(1))
-		Expect(south.asked[0].URL.Query().Get("namespace")).To(Equal("prod-shop"))
+		Expect(south.asked[0].URL.Query().Get("namespace")).To(Equal("prod-acme"))
 	})
 
 	It("names the region it could not ask, and how to go without asking", func() {
 		north.refuse = http.StatusBadGateway
 
-		err := run("logs", "-a", "shop", "-e", "prod")
+		err := run("logs", "-a", "acme", "-e", "prod")
 
-		Expect(err).To(MatchError(And(HavePrefix("asking north1 where shop runs: the gateway answered 502"), HaveSuffix("; or name the region with --region"))))
+		Expect(err).To(MatchError(And(HavePrefix("asking north1 where acme runs: the gateway answered 502"), HaveSuffix("; or name the region with --region"))))
 	})
 
 	It("reads CI runs from the region that hosts the app's CI", func() {
 		GinkgoT().Setenv("KUBECONFIG", filepath.Join(GinkgoT().TempDir(), "config"))
 		newFakeCluster().signIn("north1")
 
-		Expect(run("workflow", "list", "-a", "shop")).To(Succeed())
+		Expect(run("workflow", "list", "-a", "acme")).To(Succeed())
 
-		Expect(out.String()).To(Equal("No runs for shop in north1.\n"))
+		Expect(out.String()).To(Equal("No runs for acme in north1.\n"))
 	})
 
 	It("signs you in to every region that hosts the repo's app", func() {
@@ -88,7 +88,7 @@ var _ = Describe("finding the region", func() {
 		tool(os.Getenv("PATH"), "kubectl", "exit 0")
 		repo := GinkgoT().TempDir()
 		Expect(os.MkdirAll(filepath.Join(repo, ".ccloud"), 0o755)).To(Succeed())
-		Expect(os.WriteFile(filepath.Join(repo, ".ccloud", "app.yaml"), []byte("app: shop\n"), 0o600)).To(Succeed())
+		Expect(os.WriteFile(filepath.Join(repo, ".ccloud", "app.yaml"), []byte("app: acme\n"), 0o600)).To(Succeed())
 		was, err := os.Getwd()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(os.Chdir(repo)).To(Succeed())
@@ -105,8 +105,8 @@ var _ = Describe("finding the region", func() {
 	It("asks you to choose when more than one region hosts the environment", func() {
 		north.hosts = []string{"prod"}
 
-		err := run("logs", "-a", "shop", "-e", "prod")
+		err := run("logs", "-a", "acme", "-e", "prod")
 
-		Expect(err).To(MatchError("north1 and south1 both host shop's prod; name one with --region"))
+		Expect(err).To(MatchError("north1 and south1 both host acme's prod; name one with --region"))
 	})
 })

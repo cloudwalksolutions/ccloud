@@ -46,7 +46,7 @@ var _ = Describe("ccloud net", func() {
 	})
 
 	It("asks which environment", func() {
-		err := run("net", "-a", "shop", "-r", "north1")
+		err := run("net", "-a", "acme", "-r", "north1")
 
 		Expect(err).To(MatchError(HavePrefix("which environment? ccloud net --env <env>")))
 	})
@@ -54,15 +54,15 @@ var _ = Describe("ccloud net", func() {
 	It("names the region and what its gateway said when it cannot answer", func() {
 		gateway.refuse = http.StatusBadGateway
 
-		err := run("net", "-a", "shop", "-e", "prod", "-r", "north1")
+		err := run("net", "-a", "acme", "-e", "prod", "-r", "north1")
 
-		Expect(err).To(MatchError(HavePrefix("asking north1 about shop's prod traffic: the gateway answered 502")))
+		Expect(err).To(MatchError(HavePrefix("asking north1 about acme's prod traffic: the gateway answered 502")))
 	})
 
 	It("says when nothing went out and nothing was dropped", func() {
 		gateway.network = `{"ingress":{"requestsPerSecond":0,"serverErrors":0,"p95Seconds":0},"egress":[],"drops":[]}`
 
-		Expect(run("net", "-a", "shop", "-e", "prod", "-r", "north1")).To(Succeed())
+		Expect(run("net", "-a", "acme", "-e", "prod", "-r", "north1")).To(Succeed())
 
 		Expect(out.String()).To(Equal("Ingress over the last 1h: no requests.\n" +
 			"No connections to the internet in the last 1h.\n" +
@@ -75,7 +75,7 @@ var _ = Describe("ccloud net", func() {
 			          {"destination":"140.82.112.5","port":443,"connections":20,"unanswered":0,"reset":0}],
 			"drops":[{"destination":"10.0.4.9","port":5432,"reason":"POLICY_DENIED","count":12}]}`
 
-		Expect(run("net", "-a", "shop", "-e", "prod", "-r", "north1", "--since", "6h")).To(Succeed())
+		Expect(run("net", "-a", "acme", "-e", "prod", "-r", "north1", "--since", "6h")).To(Succeed())
 
 		Expect(gateway.asked[0].URL.Query().Get("since")).To(Equal("6h0m0s"))
 		lines := strings.Split(out.String(), "\n")

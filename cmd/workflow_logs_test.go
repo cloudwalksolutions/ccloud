@@ -51,26 +51,26 @@ var _ = Describe("ccloud workflow logs", func() {
 		}
 
 		started = time.Now().Add(-10 * time.Minute).Truncate(time.Second)
-		ci.workflows("ci-shop", ciRun("api-tests-x7k2p", started).flow("api-tests").finished("Failed", 2*time.Minute).
+		ci.workflows("ci-acme", ciRun("api-tests-x7k2p", started).flow("api-tests").finished("Failed", 2*time.Minute).
 			step("api-tests-x7k2p-2", "unit", "Failed", started.Add(45*time.Second), time.Minute, "exit code 1").
 			step("api-tests-x7k2p-1", "lint", "Succeeded", started.Add(time.Second), 41*time.Second, ""))
 	})
 
 	It("prints each step's log in the order the steps ran, each line named for its step", func() {
-		ci.podLog("ci-shop", "api-tests-x7k2p-lint-1", "ok 12 files\n")
-		ci.podLog("ci-shop", "api-tests-x7k2p-unit-2", "FAIL auth\nexit 1\n")
+		ci.podLog("ci-acme", "api-tests-x7k2p-lint-1", "ok 12 files\n")
+		ci.podLog("ci-acme", "api-tests-x7k2p-unit-2", "FAIL auth\nexit 1\n")
 
-		Expect(run("workflow", "logs", "api-tests-x7k2p", "-a", "shop", "-r", "north1")).To(Succeed())
+		Expect(run("workflow", "logs", "api-tests-x7k2p", "-a", "acme", "-r", "north1")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements("lint\tok 12 files", "unit\tFAIL auth", "unit\texit 1"))
 	})
 
 	It("prints a line however long it is, as a minified bundle or stats dump can be", func() {
 		long := strings.Repeat("x", 100_000)
-		ci.podLog("ci-shop", "api-tests-x7k2p-lint-1", long+"\nlast")
-		ci.podLog("ci-shop", "api-tests-x7k2p-unit-2", "")
+		ci.podLog("ci-acme", "api-tests-x7k2p-lint-1", long+"\nlast")
+		ci.podLog("ci-acme", "api-tests-x7k2p-unit-2", "")
 
-		Expect(run("workflow", "logs", "api-tests-x7k2p", "-a", "shop", "-r", "north1")).To(Succeed())
+		Expect(run("workflow", "logs", "api-tests-x7k2p", "-a", "acme", "-r", "north1")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements("lint\t"+long, "lint\tlast"))
 	})
@@ -78,44 +78,44 @@ var _ = Describe("ccloud workflow logs", func() {
 	It("says why the gateway would not give a step's log once its pod is gone", func() {
 		gateway.refuse = http.StatusForbidden
 
-		err := run("workflow", "logs", "api-tests-x7k2p", "-a", "shop", "-r", "north1")
+		err := run("workflow", "logs", "api-tests-x7k2p", "-a", "acme", "-r", "north1")
 
-		Expect(err).To(MatchError("the gateway answered 403 Forbidden: dev@example.test may not read logs in prod-shop"))
+		Expect(err).To(MatchError("the gateway answered 403 Forbidden: dev@example.test may not read logs in prod-acme"))
 	})
 
 	It("passes over a step that never ran, which has no log anywhere", func() {
-		ci.workflows("ci-shop", ciRun("release-m4k2p", started).flow("release").finished("Succeeded", time.Minute).
+		ci.workflows("ci-acme", ciRun("release-m4k2p", started).flow("release").finished("Succeeded", time.Minute).
 			step("release-m4k2p-1", "build", "Succeeded", started, 30*time.Second, "").
 			step("release-m4k2p-2", "deploy-preview", "Skipped", time.Time{}, 0, "when 'false' evaluated false"))
-		ci.podLog("ci-shop", "release-m4k2p-build-1", "built\n")
+		ci.podLog("ci-acme", "release-m4k2p-build-1", "built\n")
 
-		Expect(run("workflow", "logs", "release-m4k2p", "-a", "shop", "-r", "north1")).To(Succeed())
+		Expect(run("workflow", "logs", "release-m4k2p", "-a", "acme", "-r", "north1")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements("build\tbuilt"))
 		Expect(gateway.asked).To(BeEmpty())
 	})
 
 	It("prints only the failed steps with --failed", func() {
-		ci.podLog("ci-shop", "api-tests-x7k2p-lint-1", "ok 12 files\n")
-		ci.podLog("ci-shop", "api-tests-x7k2p-unit-2", "FAIL auth\n")
+		ci.podLog("ci-acme", "api-tests-x7k2p-lint-1", "ok 12 files\n")
+		ci.podLog("ci-acme", "api-tests-x7k2p-unit-2", "FAIL auth\n")
 
-		Expect(run("workflow", "logs", "api-tests-x7k2p", "-a", "shop", "-r", "north1", "--failed")).To(Succeed())
+		Expect(run("workflow", "logs", "api-tests-x7k2p", "-a", "acme", "-r", "north1", "--failed")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements("unit\tFAIL auth"))
 	})
 
 	It("reads a step whose pod is gone from the region's gateway, over the time the step ran", func() {
-		ci.podLog("ci-shop", "api-tests-x7k2p-lint-1", "ok 12 files\n")
+		ci.podLog("ci-acme", "api-tests-x7k2p-lint-1", "ok 12 files\n")
 		gateway.answers = []string{`{"entries":[
 			{"time":"2026-10-26T07:33:21Z","pod":"api-tests-x7k2p-unit-2","container":"main","line":"FAIL auth"},
 			{"time":"2026-10-26T07:33:22Z","pod":"api-tests-x7k2p-unit-2","container":"main","line":"exit 1"}]}`}
 
-		Expect(run("workflow", "logs", "api-tests-x7k2p", "-a", "shop", "-r", "north1")).To(Succeed())
+		Expect(run("workflow", "logs", "api-tests-x7k2p", "-a", "acme", "-r", "north1")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements("lint\tok 12 files", "unit\tFAIL auth", "unit\texit 1"))
 		Expect(gateway.asked).To(HaveLen(1))
 		query := gateway.asked[0].URL.Query()
-		Expect(query["namespace"]).To(Equal([]string{"ci-shop"}))
+		Expect(query["namespace"]).To(Equal([]string{"ci-acme"}))
 		Expect(query.Get("pod")).To(Equal("api-tests-x7k2p-unit-2"))
 		Expect(query.Get("container")).To(Equal("main"))
 		Expect(query.Get("start")).To(Equal(started.Add(45 * time.Second).UTC().Format(time.RFC3339)))

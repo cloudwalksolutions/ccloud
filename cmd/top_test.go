@@ -15,7 +15,7 @@ import (
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 )
 
-const prod = `{"environments":[{"name":"prod","namespace":"prod-shop",
+const prod = `{"environments":[{"name":"prod","namespace":"prod-acme",
 	"containers":[
 		{"pod":"api-7f9c","container":"api","node":"node02",
 		 "cpu":{"used":0.31,"request":0.25},"memory":{"used":412000000,"limit":1073741824},"restarts":2,"oomKills":2},
@@ -62,9 +62,9 @@ var _ = Describe("ccloud top", func() {
 	})
 
 	It("says so when the app has no environment you may read", func() {
-		Expect(run("top", "-a", "shop")).To(Succeed())
+		Expect(run("top", "-a", "acme")).To(Succeed())
 
-		Expect(out.String()).To(Equal("shop has no environment you may read.\n"))
+		Expect(out.String()).To(Equal("acme has no environment you may read.\n"))
 	})
 
 	It("asks which app outside an app repo", func() {
@@ -74,13 +74,13 @@ var _ = Describe("ccloud top", func() {
 	})
 
 	It("refuses a region the cloud does not have", func() {
-		err := run("top", "-a", "shop", "-r", "west9")
+		err := run("top", "-a", "acme", "-r", "west9")
 
 		Expect(err).To(MatchError(HavePrefix(`no region "west9"`)))
 	})
 
 	It("flags a container with no memory limit that keeps restarting, leaves a healthy one alone, and names a node stalling on memory", func() {
-		south.resources = `{"environments":[{"name":"stage","namespace":"stage-shop",
+		south.resources = `{"environments":[{"name":"stage","namespace":"stage-acme",
 			"containers":[
 				{"pod":"web-1","container":"web","node":"node03",
 				 "cpu":{"used":0.1,"request":0.1,"limit":0.5},"memory":{"used":104857600},"restarts":3,"oomKills":0},
@@ -88,7 +88,7 @@ var _ = Describe("ccloud top", func() {
 				 "cpu":{"used":0.1,"request":0.1,"limit":0.5},"memory":{"used":104857600,"limit":209715200},"restarts":0,"oomKills":0}],
 			"nodes":[{"name":"node03","cpuWait":0,"memoryStall":0.2,"conditions":[]}]}]}`
 
-		Expect(run("top", "-a", "shop", "-e", "stage")).To(Succeed())
+		Expect(run("top", "-a", "acme", "-e", "stage")).To(Succeed())
 
 		lines := strings.Split(out.String(), "\n")
 		Expect(lines[1]).To(MatchRegexp(`^web-1/web\s+0\.10/0\.10/0\.50\s+100Mi/none\s+3\s+node03\s+! no memory limit, restarted 3×$`))
@@ -99,19 +99,19 @@ var _ = Describe("ccloud top", func() {
 	It("names the region it could not ask", func() {
 		north.refuse = http.StatusBadGateway
 
-		err := run("top", "-a", "shop")
+		err := run("top", "-a", "acme")
 
-		Expect(err).To(MatchError(HavePrefix("asking north1 what shop uses: the gateway answered 502")))
+		Expect(err).To(MatchError(HavePrefix("asking north1 what acme uses: the gateway answered 502")))
 	})
 
 	It("sums every environment in every region, one row each, counting what is flagged", func() {
-		north.resources = `{"environments":[{"name":"ci","namespace":"ci-shop",
+		north.resources = `{"environments":[{"name":"ci","namespace":"ci-acme",
 			"containers":[{"pod":"runner","container":"main","node":"node05",
 			 "cpu":{"used":0.1,"request":0.2},"memory":{"used":104857600,"limit":209715200},"restarts":0,"oomKills":0}],
 			"nodes":[{"name":"node05","cpuWait":0,"memoryStall":0,"conditions":[]}]}]}`
 		south.resources = prod
 
-		Expect(run("top", "-a", "shop")).To(Succeed())
+		Expect(run("top", "-a", "acme")).To(Succeed())
 
 		lines := strings.Split(out.String(), "\n")
 		Expect(lines[0]).To(MatchRegexp(`^ENV\s+REGION\s+PODS\s+CPU USED/REQ\s+MEMORY USED/LIMIT\s+FLAGS$`))
@@ -123,7 +123,7 @@ var _ = Describe("ccloud top", func() {
 	It("shows one environment container by container, flagging its own limits apart from its nodes'", func() {
 		south.resources = prod
 
-		Expect(run("top", "-a", "shop", "-e", "prod")).To(Succeed())
+		Expect(run("top", "-a", "acme", "-e", "prod")).To(Succeed())
 
 		Expect(north.asked).To(HaveLen(1))
 		Expect(south.asked[0].URL.Query().Get("env")).To(Equal("prod"))

@@ -35,7 +35,7 @@ var _ = Describe("an app repo", func() {
 	})
 
 	It("names its app file when it cannot read it", func() {
-		inRepo("app: [shop")
+		inRepo("app: [acme")
 
 		err := run("workflow", "list", "-r", "north1")
 
@@ -43,18 +43,18 @@ var _ = Describe("an app repo", func() {
 	})
 
 	It("names the app for you anywhere inside it", func() {
-		root := inRepo("app: shop\n")
+		root := inRepo("app: acme\n")
 		Expect(os.MkdirAll(filepath.Join(root, "src", "api"), 0o755)).To(Succeed())
 		Expect(os.Chdir(filepath.Join(root, "src", "api"))).To(Succeed())
 		newFakeCluster().signIn("north1")
 
 		Expect(run("workflow", "list", "-r", "north1")).To(Succeed())
 
-		Expect(out.String()).To(Equal("No runs for shop in north1.\n"))
+		Expect(out.String()).To(Equal("No runs for acme in north1.\n"))
 	})
 
 	It("still lets you name another app", func() {
-		inRepo("app: shop\n")
+		inRepo("app: acme\n")
 		newFakeCluster().signIn("north1")
 
 		Expect(run("workflow", "list", "-a", "other", "-r", "north1")).To(Succeed())
