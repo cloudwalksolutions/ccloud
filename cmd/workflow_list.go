@@ -22,7 +22,9 @@ func workflowList(c *cobra.Command, region cloud.Region, app string, ci workflow
 	}
 	limit, _ := c.Flags().GetInt("limit")
 	namespace := "ci-" + app
+	done := step(c, fmt.Sprintf("Reading %s's runs in %s", app, region.Name))
 	runs, err := ci.List(c.Context(), selector.String())
+	done(err, fmt.Sprintf("Read %s's runs", app))
 	if apierrors.IsForbidden(err) {
 		err = fmt.Errorf("you may not read %s's runs in %s (%s)", app, region.Name, namespace)
 	}

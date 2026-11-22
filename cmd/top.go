@@ -47,12 +47,17 @@ func topCmd(home cloud.Cloud) *cobra.Command {
 	return command
 }
 
-func usagesOf(c *cobra.Command, home cloud.Cloud, name, app, env string) ([]regionUsage, error) {
+func usagesOf(c *cobra.Command, home cloud.Cloud, name, app, env string) (usages []regionUsage, err error) {
 	regions, err := namedOr(c, home, name, func(*cobra.Command) ([]cloud.Region, error) { return home.Regions, nil })
 	if err != nil {
 		return nil, err
 	}
-	var usages []regionUsage
+	names := make([]string, len(regions))
+	for i, region := range regions {
+		names[i] = region.Name
+	}
+	done := step(c, fmt.Sprintf("Asking %s what %s uses", and(names), app))
+	defer func() { done(err, fmt.Sprintf("Read what %s uses", app)) }()
 	for _, region := range regions {
 		signedIn, err := sessionOf(c).gateway(c, home, region)
 		var found []gateway.Usage

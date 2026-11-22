@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -49,6 +50,7 @@ func logContainersCmd(home cloud.Cloud) *cobra.Command {
 		Example: "  ccloud logs containers -e stage",
 	}, namedEnv, func(c *cobra.Command, region cloud.Region, app string) error {
 		env, _ := c.Flags().GetString("env")
+		done := step(c, fmt.Sprintf("Reading which containers %s's %s logged in %s", app, env, region.Name))
 		signedIn, err := sessionOf(c).gateway(c, home, region)
 		var containers []string
 		if err == nil {
@@ -57,6 +59,7 @@ func logContainersCmd(home cloud.Cloud) *cobra.Command {
 				"start":     {time.Now().Add(-24 * time.Hour).UTC().Format(time.RFC3339)},
 			})
 		}
+		done(err, fmt.Sprintf("%s's %s logged %s", app, env, quantity(len(containers), "container")))
 		for _, container := range containers {
 			fmt.Fprintln(c.OutOrStdout(), container)
 		}
@@ -88,7 +91,9 @@ func readLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 		return fmt.Errorf("output is pretty, raw or json, not %q", format)
 	}
 	printer := logPrinter{out: c.OutOrStdout(), format: format, color: paletteFor(c.OutOrStdout())}
+	done := step(c, fmt.Sprintf("Reading %s's %s logs in %s", app, env, region.Name))
 	page, err := reader.read(query)
+	done(err, fmt.Sprintf("Read %s of %s's %s logs", quantity(len(page.Entries), "line"), app, env))
 	if c.Context().Err() != nil {
 		return nil
 	}
@@ -126,6 +131,7 @@ func followLogs(c *cobra.Command, reader *logReader, query url.Values, printer l
 	}
 	printed := map[gateway.Entry]bool{}
 	wait, signedInAgain := time.Second, false
+	fmt.Fprintln(c.ErrOrStderr(), "Following new lines; Ctrl-C stops.")
 	for {
 		query.Set("start", from.UTC().Format(time.RFC3339Nano))
 		end, err := reader.stream(query, func(entry gateway.Entry) error {
@@ -161,6 +167,7 @@ func followLogs(c *cobra.Command, reader *logReader, query url.Values, printer l
 		case refused.Status >= 400 && refused.Status < 500:
 			return mayNotRead(err, app, env, region)
 		}
+		fmt.Fprintf(c.ErrOrStderr(), "Lost the log stream (%s); reconnecting in %s.\n", cmp.Or(end, fmt.Sprint(err)), wait)
 		select {
 		case <-c.Context().Done():
 			return nil

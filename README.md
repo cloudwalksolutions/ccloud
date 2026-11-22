@@ -11,6 +11,8 @@ The cask brings `kubectl`, `cloudflared` and kubelogin with it.
 `ccloud --version` says when a newer release is out, and any command says so at most once a day.
 `CCLOUD_NO_UPDATE_CHECK=1` turns that off.
 
+What a command is waiting on goes to stderr, so its output on stdout stays clean to pipe or parse.
+
 ## Clusters
 
 ```sh

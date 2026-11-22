@@ -17,17 +17,17 @@ import (
 
 var _ = Describe("ccloud net", func() {
 	var (
-		out     *bytes.Buffer
-		gateway *fakeGateway
-		home    cloud.Cloud
+		out, errs *bytes.Buffer
+		gateway   *fakeGateway
+		home      cloud.Cloud
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, home, "dev")
+		return cmd.Run(args, out, errs, home, "dev")
 	}
 
 	BeforeEach(func() {
-		out = &bytes.Buffer{}
+		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		gateway = &fakeGateway{hosts: []string{"prod"}}
 		server := httptest.NewServer(http.HandlerFunc(gateway.serve))
 		DeferCleanup(server.Close)
@@ -57,6 +57,7 @@ var _ = Describe("ccloud net", func() {
 		err := run("net", "-a", "acme", "-e", "prod", "-r", "north1")
 
 		Expect(err).To(MatchError(HavePrefix("asking north1 about acme's prod traffic: the gateway answered 502")))
+		Expect(errs.String()).To(Equal("Asking north1 about acme's prod traffic…\n"))
 	})
 
 	It("says when nothing went out and nothing was dropped", func() {

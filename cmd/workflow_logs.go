@@ -16,22 +16,31 @@ import (
 func workflowLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app string, runs workflows.Runs, run workflows.Run) error {
 	kept := &logReader{c: c, home: home, region: region}
 	onlyFailed, _ := c.Flags().GetBool("failed")
-	for _, step := range run.Steps() {
-		if step.StartedAt.IsZero() || (onlyFailed && !failed(step.Phase)) {
+	for _, ran := range run.Steps() {
+		if ran.StartedAt.IsZero() || (onlyFailed && !failed(ran.Phase)) {
 			continue
 		}
-		text, err := runs.StepLog(c.Context(), run, step)
-		if apierrors.IsNotFound(err) {
-			text, err = keptLog(kept, app, run, step)
-		}
+		text, err := stepLog(c, kept, app, runs, run, ran)
 		if err != nil {
 			return err
 		}
 		for line := range strings.Lines(text) {
-			fmt.Fprintf(c.OutOrStdout(), "%s\t%s\n", step.DisplayName, strings.TrimSuffix(line, "\n"))
+			fmt.Fprintf(c.OutOrStdout(), "%s\t%s\n", ran.DisplayName, strings.TrimSuffix(line, "\n"))
 		}
 	}
 	return nil
+}
+
+func stepLog(c *cobra.Command, kept *logReader, app string, runs workflows.Runs, run workflows.Run, ran workflows.Step) (string, error) {
+	done := step(c, fmt.Sprintf("Reading %s's log", ran.DisplayName))
+	text, err := runs.StepLog(c.Context(), run, ran)
+	if apierrors.IsNotFound(err) {
+		done(nil, ran.DisplayName+"'s pod is gone")
+		done = step(c, fmt.Sprintf("Reading %s's kept log from %s's gateway", ran.DisplayName, kept.region.Name))
+		text, err = keptLog(kept, app, run, ran)
+	}
+	done(err, fmt.Sprintf("Read %s's log", ran.DisplayName))
+	return text, err
 }
 
 func failed(phase string) bool {

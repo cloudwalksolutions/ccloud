@@ -76,7 +76,10 @@ type runAction func(c *cobra.Command, region cloud.Region, app string, runs work
 func runCmd(home cloud.Cloud, command *cobra.Command, action runAction) *cobra.Command {
 	command.Args = oneRun
 	return ciCmd(home, command, func(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs) error {
-		run, err := getRun(c, runs, region, app, c.Flags().Arg(0))
+		name := c.Flags().Arg(0)
+		done := step(c, fmt.Sprintf("Reading %s in %s", name, region.Name))
+		run, err := getRun(c, runs, region, app, name)
+		done(err, fmt.Sprintf("Read %s", name))
 		if err != nil {
 			return err
 		}

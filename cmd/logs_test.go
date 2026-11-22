@@ -109,13 +109,13 @@ func (g *fakeGateway) serve(w http.ResponseWriter, r *http.Request) {
 
 var _ = Describe("ccloud logs", func() {
 	var (
-		out     *bytes.Buffer
-		gateway *fakeGateway
-		home    cloud.Cloud
+		out, errs *bytes.Buffer
+		gateway   *fakeGateway
+		home      cloud.Cloud
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, home, "dev")
+		return cmd.Run(args, out, errs, home, "dev")
 	}
 
 	tool := func(bin, name, script string) {
@@ -123,7 +123,7 @@ var _ = Describe("ccloud logs", func() {
 	}
 
 	BeforeEach(func() {
-		out = &bytes.Buffer{}
+		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		gateway = &fakeGateway{}
 		server := httptest.NewServer(http.HandlerFunc(gateway.serve))
 		DeferCleanup(server.Close)
@@ -197,9 +197,14 @@ var _ = Describe("ccloud logs", func() {
 			}
 		}
 
-		Expect(cmd.RunContext(ctx, []string{"logs", "-a", "acme", "-e", "prod", "-r", "north1", "-f", "-c", "api"}, out, out, home, "dev")).To(Succeed())
+		Expect(cmd.RunContext(ctx, []string{"logs", "-a", "acme", "-e", "prod", "-r", "north1", "-f", "-c", "api"}, out, errs, home, "dev")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements(HaveSuffix("api-7f9c first"), HaveSuffix("api-7f9c second"), HaveSuffix("api-7f9c third")))
+		Expect(lines(errs)).To(HaveExactElements(
+			"Reading acme's prod logs in north1…",
+			"Following new lines; Ctrl-C stops.",
+			"Lost the log stream (unexpected EOF); reconnecting in 1s.",
+		))
 		streamed := gateway.asked[1].URL
 		Expect(streamed.Path).To(Equal("/v1/logs/stream"))
 		Expect(streamed.Query().Get("start")).To(Equal("2026-10-26T07:33:21.5Z"))
@@ -211,7 +216,7 @@ var _ = Describe("ccloud logs", func() {
 
 	Context("following", func() {
 		follow := func(ctx context.Context, extra ...string) error {
-			return cmd.RunContext(ctx, append([]string{"logs", "-a", "acme", "-e", "prod", "-r", "north1", "-f"}, extra...), out, out, home, "dev")
+			return cmd.RunContext(ctx, append([]string{"logs", "-a", "acme", "-e", "prod", "-r", "north1", "-f"}, extra...), out, errs, home, "dev")
 		}
 		line := `{"time":"2026-10-26T07:33:22Z","pod":"api-7f9c","container":"api","line":"ERR boom"}` + "\n"
 
@@ -288,6 +293,7 @@ var _ = Describe("ccloud logs", func() {
 		Expect(run("logs", "containers", "-a", "acme", "-e", "prod", "-r", "north1")).To(Succeed())
 
 		Expect(out.String()).To(Equal("api\nnginx\n"))
+		Expect(errs.String()).To(Equal("Reading which containers acme's prod logged in north1…\n"))
 		Expect(gateway.asked[0].URL.Query()["namespace"]).To(Equal([]string{"prod-acme"}))
 		Expect(time.Parse(time.RFC3339, gateway.asked[0].URL.Query().Get("start"))).To(BeTemporally("~", time.Now().Add(-24*time.Hour), 5*time.Second))
 	})
@@ -382,7 +388,7 @@ esac`)
 		err := run("logs", "-a", "acme", "-e", "prod", "-r", "north1")
 
 		Expect(err).To(MatchError(HavePrefix("signing in to " + home.Regions[0].Gateway + " through Cloudflare Access")))
-		Expect(out.String()).To(ContainSubstring("Unable to reach the login page"))
+		Expect(errs.String()).To(ContainSubstring("Unable to reach the login page"))
 		Expect(gateway.asked).To(BeEmpty())
 	})
 
@@ -392,6 +398,7 @@ esac`)
 		err := run("logs", "-a", "acme", "-e", "prod", "-r", "north1")
 
 		Expect(err).To(MatchError("the gateway answered 502 Bad Gateway: dev@example.test may not read logs in prod-acme"))
+		Expect(errs.String()).To(Equal("Reading acme's prod logs in north1…\n"))
 	})
 
 	It("shows why the cloud's issuer would not sign you in, and asks the gateway nothing", func() {
@@ -403,7 +410,7 @@ esac`)
 		err := run("logs", "-a", "acme", "-e", "prod", "-r", "north1")
 
 		Expect(err).To(MatchError("signing in to " + home.Issuer + " failed"))
-		Expect(out.String()).To(ContainSubstring("oauth2: invalid_grant"))
+		Expect(errs.String()).To(ContainSubstring("oauth2: invalid_grant"))
 		Expect(gateway.asked).To(BeEmpty())
 	})
 
@@ -448,7 +455,7 @@ esac`)
 
 		Expect(run("logs", "-a", "acme", "-e", "prod", "-r", "north1", "--tail", "1")).To(Succeed())
 
-		Expect(lines(out)[1]).To(Equal("Showed the newest 1 lines; raise --tail or narrow --since or --until for more."))
+		Expect(lines(errs)).To(ContainElement("Showed the newest 1 lines; raise --tail or narrow --since or --until for more."))
 	})
 
 	It("shows today's lines by the time alone, to the millisecond", func() {
