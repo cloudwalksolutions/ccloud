@@ -21,11 +21,13 @@ func netCmd(home cloud.Cloud) *cobra.Command {
 	}, namedEnv, func(c *cobra.Command, region cloud.Region, app string) error {
 		env, _ := c.Flags().GetString("env")
 		since, _ := c.Flags().GetDuration("since")
+		done := step(c, fmt.Sprintf("Asking %s about %s's %s traffic", region.Name, app, env))
 		signedIn, err := sessionOf(c).gateway(c, home, region)
 		var seen gateway.Traffic
 		if err == nil {
 			seen, err = signedIn.Network(c.Context(), app, env, since)
 		}
+		done(err, fmt.Sprintf("Read %s's %s traffic", app, env))
 		if err != nil {
 			return fmt.Errorf("asking %s about %s's %s traffic: %w", region.Name, app, env, err)
 		}

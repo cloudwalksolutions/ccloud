@@ -27,13 +27,13 @@ const prod = `{"environments":[{"name":"prod","namespace":"prod-acme",
 
 var _ = Describe("ccloud top", func() {
 	var (
-		out          *bytes.Buffer
+		out, errs    *bytes.Buffer
 		north, south *fakeGateway
 		home         cloud.Cloud
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, home, "dev")
+		return cmd.Run(args, out, errs, home, "dev")
 	}
 
 	serve := func(g *fakeGateway) string {
@@ -43,7 +43,7 @@ var _ = Describe("ccloud top", func() {
 	}
 
 	BeforeEach(func() {
-		out = &bytes.Buffer{}
+		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		north = &fakeGateway{}
 		south = &fakeGateway{}
 		home = example
@@ -102,6 +102,7 @@ var _ = Describe("ccloud top", func() {
 		err := run("top", "-a", "acme")
 
 		Expect(err).To(MatchError(HavePrefix("asking north1 what acme uses: the gateway answered 502")))
+		Expect(errs.String()).To(Equal("Asking north1 and south1 what acme uses…\n"))
 	})
 
 	It("sums every environment in every region, one row each, counting what is flagged", func() {

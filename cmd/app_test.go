@@ -71,6 +71,7 @@ var _ = Describe("ccloud app", func() {
 		north.refuse = http.StatusBadGateway
 
 		Expect(run("app", "-a", "acme", "--summary", "-r", "north1")).To(MatchError(HavePrefix("asking north1 for acme's summary: the gateway answered 502")))
+		Expect(errs.String()).To(Equal("Asking north1 for acme's summary…\n"))
 	})
 
 	It("says when nothing is open, and marks a draft as a draft", func() {

@@ -68,11 +68,13 @@ func summarize(c *cobra.Command, home cloud.Cloud, name, app string, weeks int) 
 	if err != nil {
 		return err
 	}
+	done := step(c, fmt.Sprintf("Asking %s for %s's summary", region.Name, app))
 	signedIn, err := sessionOf(c).gateway(c, home, region)
 	var s gateway.Summary
 	if err == nil {
 		s, err = signedIn.Summary(c.Context(), app, weeks)
 	}
+	done(err, fmt.Sprintf("Read %s's summary", app))
 	if err != nil {
 		return fmt.Errorf("asking %s for %s's summary: %w", region.Name, app, err)
 	}
