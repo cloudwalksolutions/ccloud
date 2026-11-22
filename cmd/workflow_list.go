@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -37,18 +36,16 @@ func workflowList(c *cobra.Command, region cloud.Region, app string, ci workflow
 	}
 	now := time.Now()
 	color := paletteFor(c.OutOrStdout())
-	table := tabwriter.NewWriter(c.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintln(table, color.paint("01", "STATUS")+"\tFLOW\tPR\tBRANCH\tSHA\tID\tELAPSED\tAGE")
+	table := newTable(c.OutOrStdout(), "STATUS", "FLOW", "PR", "BRANCH", "SHA", "ID", "ELAPSED", "AGE")
 	for _, run := range runs[:min(len(runs), limit)] {
 		pr := ""
 		if run.PR() != "" {
 			pr = "#" + run.PR()
 		}
-		fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			color.status(run.Status.Phase), run.Flow(), pr, run.Branch(), short(run.SHA()), run.Name(),
-			run.Elapsed(now).Round(time.Second), age(now.Sub(run.Metadata.CreationTimestamp)))
+		table.row(color.status(run.Status.Phase), run.Flow(), pr, run.Branch(), short(run.SHA()), run.Name(),
+			run.Elapsed(now).Round(time.Second).String(), age(now.Sub(run.Metadata.CreationTimestamp)))
 	}
-	return table.Flush()
+	return table.print()
 }
 
 func symbol(phase string) string {

@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -119,6 +120,16 @@ var _ = Describe("ccloud top", func() {
 		Expect(lines[1]).To(MatchRegexp(`^ci\s+north1\s+1\s+0\.10/0\.20\s+100Mi/200Mi\s+! 1 container$`))
 		Expect(lines[2]).To(MatchRegexp(`^prod\s+south1\s+2\s+0\.36/0\.26\s+453Mi/1\.1Gi\s+! 2 containers, 1 node$`))
 		Expect(lines[3]).To(Equal("ccloud top -e <env> shows each container and why it is flagged."))
+	})
+
+	It("lines its columns up under a bold header on a terminal", func() {
+		GinkgoT().Setenv("CLICOLOR_FORCE", "1")
+		south.resources = prod
+
+		Expect(run("top", "-a", "acme")).To(Succeed())
+
+		lines := strings.Split(regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(out.String(), ""), "\n")
+		Expect(strings.Index(lines[1], "south1")).To(Equal(strings.Index(lines[0], "REGION")))
 	})
 
 	It("shows one environment container by container, flagging its own limits apart from its nodes'", func() {

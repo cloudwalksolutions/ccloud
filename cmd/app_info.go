@@ -1,11 +1,12 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"slices"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -54,13 +55,11 @@ func printEnvironmentList(c *cobra.Command, environments map[string][]gateway.En
 		}
 	}
 	slices.SortFunc(rows, func(a, b row) int { return strings.Compare(a.env, b.env) })
-	color := paletteFor(c.OutOrStdout())
-	table := tabwriter.NewWriter(c.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintln(table, color.paint("01", "ENV")+"\tREGION\tURL")
+	table := newTable(c.OutOrStdout(), "ENV", "REGION", "URL")
 	for _, r := range rows {
-		fmt.Fprintln(table, strings.TrimRight(r.env+"\t"+r.region+"\t"+r.url, "\t"))
+		table.row(r.env, r.region, r.url)
 	}
-	return table.Flush()
+	return table.print()
 }
 
 func summarize(c *cobra.Command, home cloud.Cloud, name, app string, weeks int) error {
@@ -79,14 +78,17 @@ func summarize(c *cobra.Command, home cloud.Cloud, name, app string, weeks int) 
 		return fmt.Errorf("asking %s for %s's summary: %w", region.Name, app, err)
 	}
 	out := c.OutOrStdout()
-	color := paletteFor(out)
-	table := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	if len(s.Pulls) == 0 {
-		fmt.Fprintln(table, "No open pull requests.")
-	} else {
-		fmt.Fprintln(table, color.paint("01", "PR")+"\tTITLE\tAUTHOR\tOPENED\tREVIEW\tCHECKS\tENVIRONMENT")
+	return errors.Join(printPulls(out, s.Pulls), printWeeks(out, s, weeks))
+}
+
+func printPulls(out io.Writer, pulls []gateway.Pull) error {
+	if len(pulls) == 0 {
+		_, err := fmt.Fprintln(out, "No open pull requests.")
+		return err
 	}
-	for _, p := range s.Pulls {
+	color := paletteFor(out)
+	table := newTable(out, "PR", "TITLE", "AUTHOR", "OPENED", "REVIEW", "CHECKS", "ENVIRONMENT")
+	for _, p := range pulls {
 		review := "waiting"
 		switch {
 		case p.Draft:
@@ -99,18 +101,22 @@ func summarize(c *cobra.Command, home cloud.Cloud, name, app string, weeks int) 
 			checks[i] = color.status(check.Status) + " " + check.Flow
 		}
 		opened := age(time.Duration(p.OpenedHoursAgo * float64(time.Hour)))
-		fmt.Fprintln(table, strings.TrimRight(fmt.Sprintf("#%d\t%s\t%s\t%s\t%s\t%s\t%s",
-			p.Number, p.Title, p.Author, opened, review, strings.Join(checks, "  "), p.Environment), "\t"))
+		table.row("#"+strconv.Itoa(p.Number), p.Title, p.Author, opened, review, strings.Join(checks, "  "), p.Environment)
 	}
-	fmt.Fprintf(table, "\nLast %s:\n", quantity(weeks, "week"))
-	fmt.Fprintf(table, "  pull requests\t%d merged; %s from open to merge; %s to a first review\n",
-		s.Flow.Merged, hours(s.Flow.OpenToMergeHours), hours(s.Flow.FirstReviewHours))
-	fmt.Fprintf(table, "  delivery\t%s; %s from merge to prod\n", quantity(s.Delivery.Deploys, "prod deploy"), hours(s.Delivery.MergeToProdHours))
+	return table.print()
+}
+
+func printWeeks(out io.Writer, s gateway.Summary, weeks int) error {
+	fmt.Fprintf(out, "\nLast %s:\n", quantity(weeks, "week"))
+	table := newTable(out)
+	table.row("  pull requests", fmt.Sprintf("%d merged; %s from open to merge; %s to a first review",
+		s.Flow.Merged, hours(s.Flow.OpenToMergeHours), hours(s.Flow.FirstReviewHours)))
+	table.row("  delivery", fmt.Sprintf("%s; %s from merge to prod", quantity(s.Delivery.Deploys, "prod deploy"), hours(s.Delivery.MergeToProdHours)))
 	for _, ci := range s.CI {
-		fmt.Fprintf(table, "  %s\t%s; median %s; %s pass first time; %s\n", ci.Flow, quantity(ci.Runs, "run"),
-			time.Duration(ci.MedianSeconds*float64(time.Second)), percent(ci.FirstTryPassRate), quantity(ci.Reruns, "rerun"))
+		table.row("  "+ci.Flow, fmt.Sprintf("%s; median %s; %s pass first time; %s", quantity(ci.Runs, "run"),
+			time.Duration(ci.MedianSeconds*float64(time.Second)), percent(ci.FirstTryPassRate), quantity(ci.Reruns, "rerun")))
 	}
-	return table.Flush()
+	return table.print()
 }
 
 func quantity(n int, thing string) string {

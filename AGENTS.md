@@ -27,6 +27,8 @@ comes next is in `specs/`.
   the real clusters with `./ccloud`; after it releases, upgrade and run them again.
 - Progress goes to stderr, data to stdout: a wait gets a `step`, and specs give stdout and stderr
   separate buffers.
+- Every table goes through `newTable` (`cmd/table.go`), never `text/tabwriter`, which counts color
+  codes as width and misaligns colored cells.
 
 ## Commands
 

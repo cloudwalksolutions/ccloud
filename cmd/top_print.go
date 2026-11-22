@@ -4,37 +4,36 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strconv"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
 
 func printContainers(out io.Writer, usages []regionUsage) error {
 	color := paletteFor(out)
-	table := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(table, color.paint("01", "CONTAINER")+"\tCPU USED/REQ/LIMIT\tMEMORY USED/LIMIT\tRESTARTS\tNODE\tFLAGS")
+	table := newTable(out, "CONTAINER", "CPU USED/REQ/LIMIT", "MEMORY USED/LIMIT", "RESTARTS", "NODE", "FLAGS")
 	var nodes []gateway.Node
 	for _, u := range usages {
 		for _, c := range u.usage.Containers {
-			fmt.Fprintf(table, "%s/%s\t%s/%s/%s\t%s/%s\t%.0f\t%s%s\n", c.Pod, c.Container,
-				cores(&c.CPU.Used), cores(c.CPU.Request), cores(c.CPU.Limit),
-				memory(&c.Memory.Used), memory(c.Memory.Limit), c.Restarts, c.Node, color.flags(containerFlags(c)))
+			table.row(c.Pod+"/"+c.Container,
+				cores(&c.CPU.Used)+"/"+cores(c.CPU.Request)+"/"+cores(c.CPU.Limit),
+				memory(&c.Memory.Used)+"/"+memory(c.Memory.Limit), fmt.Sprintf("%.0f", c.Restarts), c.Node, color.flags(containerFlags(c)))
 		}
 		nodes = append(nodes, u.usage.Nodes...)
 	}
+	err := table.print()
 	for _, n := range nodes {
 		if pressure := nodeFlags(n); len(pressure) > 0 {
-			fmt.Fprintf(table, "\n%s is under pressure (the node, not your limits): %s\n", n.Name, strings.Join(pressure, ", "))
+			fmt.Fprintf(out, "\n%s is under pressure (the node, not your limits): %s\n", n.Name, strings.Join(pressure, ", "))
 		}
 	}
-	return table.Flush()
+	return err
 }
 
 func printEnvironments(out io.Writer, usages []regionUsage) error {
 	color := paletteFor(out)
-	table := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(table, color.paint("01", "ENV")+"\tREGION\tPODS\tCPU USED/REQ\tMEMORY USED/LIMIT\tFLAGS")
+	table := newTable(out, "ENV", "REGION", "PODS", "CPU USED/REQ", "MEMORY USED/LIMIT", "FLAGS")
 	for _, u := range usages {
 		var cpu, requested, used, limit float64
 		pods := map[string]bool{}
@@ -59,11 +58,12 @@ func printEnvironments(out io.Writer, usages []regionUsage) error {
 				pressured++
 			}
 		}
-		fmt.Fprintf(table, "%s\t%s\t%d\t%.2f/%.2f\t%s/%s%s\n", u.usage.Name, u.region.Name, len(pods), cpu, requested,
-			memory(&used), memory(&limit), color.flags(counted(containers, "container", counted(pressured, "node", nil))))
+		table.row(u.usage.Name, u.region.Name, strconv.Itoa(len(pods)), fmt.Sprintf("%.2f/%.2f", cpu, requested),
+			memory(&used)+"/"+memory(&limit), color.flags(counted(containers, "container", counted(pressured, "node", nil))))
 	}
-	fmt.Fprintln(table, "ccloud top -e <env> shows each container and why it is flagged.")
-	return table.Flush()
+	err := table.print()
+	fmt.Fprintln(out, "ccloud top -e <env> shows each container and why it is flagged.")
+	return err
 }
 
 func counted(n int, thing string, rest []string) []string {
@@ -114,7 +114,7 @@ func (p palette) flags(flags []string) string {
 	if len(flags) == 0 {
 		return ""
 	}
-	return "\t" + p.paint("31", "! "+strings.Join(flags, ", "))
+	return p.paint("31", "! "+strings.Join(flags, ", "))
 }
 
 func percent(fraction float64) string { return fmt.Sprintf("%.0f%%", math.Round(fraction*100)) }
