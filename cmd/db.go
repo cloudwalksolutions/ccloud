@@ -5,8 +5,8 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"strconv"
 	"sync"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -108,14 +108,14 @@ func (t dbConnection) print(out io.Writer, closer string) error {
 		userinfo = url.UserPassword(t.owner.User, password).String()
 	}
 	fmt.Fprintf(out, "Tunneled to %s's %s database in %s; %s closes it.\n", t.app, t.env, t.region.Name, closer)
-	table := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(table, "  host\tlocalhost\n")
-	fmt.Fprintf(table, "  port\t%d\n", t.port)
-	fmt.Fprintf(table, "  database\t%s\n", t.owner.Name)
-	fmt.Fprintf(table, "  user\t%s\n", t.owner.User)
-	fmt.Fprintf(table, "  password\t%s\n", password)
-	fmt.Fprintf(table, "  url\tpostgres://%s@localhost:%d/%s\n", userinfo, t.port, t.owner.Name)
-	return table.Flush()
+	table := newTable(out)
+	table.row("  host", "localhost")
+	table.row("  port", strconv.Itoa(t.port))
+	table.row("  database", t.owner.Name)
+	table.row("  user", t.owner.User)
+	table.row("  password", password)
+	table.row("  url", fmt.Sprintf("postgres://%s@localhost:%d/%s", userinfo, t.port, t.owner.Name))
+	return table.print()
 }
 
 func truncated(secret string) string {

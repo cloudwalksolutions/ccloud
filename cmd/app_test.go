@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -120,5 +122,22 @@ var _ = Describe("ccloud app", func() {
 			"  delivery       1 prod deploy; 1h from merge to prod",
 			"  api-tests      3 runs; median 11m40s; 50% pass first time; 1 rerun",
 		}))
+	})
+
+	It("lines up pull requests with different numbers of colored checks on a terminal", func() {
+		GinkgoT().Setenv("CLICOLOR_FORCE", "1")
+		north.summary = `{"pulls":[
+			{"number":105,"title":"Search","author":"dev","openedHoursAgo":1,"environment":"https://boat-105.acme.test",
+			 "checks":[{"flow":"api","status":"Succeeded"},{"flow":"web","status":"Failed"}]},
+			{"number":106,"title":"Map","author":"dev","openedHoursAgo":1,"environment":"https://boat-106.acme.test",
+			 "checks":[{"flow":"api-tests","status":"Running"}]}],
+			"flow":{},"delivery":{},"ci":[]}`
+
+		Expect(run("app", "-a", "acme", "--summary")).To(Succeed())
+
+		lines := strings.Split(regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(out.String(), ""), "\n")
+		column := func(line, text string) int { return utf8.RuneCountInString(line[:strings.Index(line, text)]) }
+		Expect(column(lines[1], "https://")).To(Equal(column(lines[0], "ENVIRONMENT")))
+		Expect(column(lines[2], "https://")).To(Equal(column(lines[0], "ENVIRONMENT")))
 	})
 })

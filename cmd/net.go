@@ -1,10 +1,11 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -40,37 +41,47 @@ func netCmd(home cloud.Cloud) *cobra.Command {
 
 func printTraffic(out io.Writer, seen gateway.Traffic, since time.Duration) error {
 	window := strings.TrimSuffix(strings.TrimSuffix(since.String(), "0s"), "0m")
-	color := paletteFor(out)
-	table := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	in := seen.Ingress
 	if in.RequestsPerSecond == 0 {
-		fmt.Fprintf(table, "Ingress over the last %s: no requests.\n", window)
+		fmt.Fprintf(out, "Ingress over the last %s: no requests.\n", window)
 	} else {
-		fmt.Fprintf(table, "Ingress over the last %s: %.2f requests/s, %.1f%% 5xx, p95 %s.\n", window,
+		fmt.Fprintf(out, "Ingress over the last %s: %.2f requests/s, %.1f%% 5xx, p95 %s.\n", window,
 			in.RequestsPerSecond, in.ServerErrors*100, time.Duration(in.P95Seconds*float64(time.Second)).Round(time.Millisecond))
 	}
-	if len(seen.Egress) == 0 {
-		fmt.Fprintf(table, "No connections to the internet in the last %s.\n", window)
-	} else {
-		fmt.Fprintln(table, "\n"+color.paint("01", "DESTINATION")+"\tPORT\tCONNECTIONS\tUNANSWERED\tRESET")
-		for _, e := range seen.Egress {
-			var flags []string
-			if e.Unanswered/e.Connections >= 0.1 {
-				flags = append(flags, fmt.Sprintf("%s unanswered", percent(e.Unanswered/e.Connections)))
-			}
-			if e.Reset > 0 {
-				flags = append(flags, fmt.Sprintf("%.0f reset", e.Reset))
-			}
-			fmt.Fprintf(table, "%s\t%d\t%.0f\t%.0f\t%.0f%s\n", e.Destination, e.Port, e.Connections, e.Unanswered, e.Reset, color.flags(flags))
-		}
+	return errors.Join(printEgress(out, seen.Egress, window), printDrops(out, seen.Drops, window))
+}
+
+func printEgress(out io.Writer, egress []gateway.Egress, window string) error {
+	if len(egress) == 0 {
+		_, err := fmt.Fprintf(out, "No connections to the internet in the last %s.\n", window)
+		return err
 	}
-	if len(seen.Drops) == 0 {
-		fmt.Fprintf(table, "No connections dropped in the last %s.\n", window)
-	} else {
-		fmt.Fprintln(table, "\n"+color.paint("01", "DROPPED TO")+"\tPORT\tREASON\tCOUNT")
-		for _, d := range seen.Drops {
-			fmt.Fprintf(table, "%s\t%d\t%s\t%.0f\n", d.Destination, d.Port, d.Reason, d.Count)
+	color := paletteFor(out)
+	fmt.Fprintln(out)
+	table := newTable(out, "DESTINATION", "PORT", "CONNECTIONS", "UNANSWERED", "RESET")
+	for _, e := range egress {
+		var flags []string
+		if e.Unanswered/e.Connections >= 0.1 {
+			flags = append(flags, fmt.Sprintf("%s unanswered", percent(e.Unanswered/e.Connections)))
 		}
+		if e.Reset > 0 {
+			flags = append(flags, fmt.Sprintf("%.0f reset", e.Reset))
+		}
+		table.row(e.Destination, strconv.Itoa(e.Port), fmt.Sprintf("%.0f", e.Connections), fmt.Sprintf("%.0f", e.Unanswered),
+			fmt.Sprintf("%.0f", e.Reset), color.flags(flags))
 	}
-	return table.Flush()
+	return table.print()
+}
+
+func printDrops(out io.Writer, drops []gateway.Drop, window string) error {
+	if len(drops) == 0 {
+		_, err := fmt.Fprintf(out, "No connections dropped in the last %s.\n", window)
+		return err
+	}
+	fmt.Fprintln(out)
+	table := newTable(out, "DROPPED TO", "PORT", "REASON", "COUNT")
+	for _, d := range drops {
+		table.row(d.Destination, strconv.Itoa(d.Port), d.Reason, fmt.Sprintf("%.0f", d.Count))
+	}
+	return table.print()
 }
