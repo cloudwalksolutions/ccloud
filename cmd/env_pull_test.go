@@ -9,6 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -163,7 +166,7 @@ var _ = Describe("ccloud env pull", func() {
 			})
 		})
 
-		It("signs you in to Google when it has no credentials for you, then pulls", func() {
+		It("signs you in to Google on stderr when it has no credentials for you, then pulls", func() {
 			tool("gcloud", `case "$*" in
   "auth application-default login") : > "$0.signed-in"; echo "Credentials saved." ;;
   *) [ -f "$0.signed-in" ] && echo adc-token || { echo "Your default credentials were not found." >&2; exit 1; } ;;
@@ -171,12 +174,16 @@ esac`)
 
 			Expect(run("env", "pull")).To(Succeed())
 
-			Expect(out.String()).To(HavePrefix("Signing you in to Google to read acme's secrets.\nCredentials saved.\nsrc/api/.env, from acme's feat-x in north1:\n"))
+			Expect(errs.String()).To(HaveSuffix("gets…\nSigning you in to Google to read acme's secrets…\nCredentials saved.\nReading 2 of acme's secrets from Google Secret Manager…\n"))
+			Expect(out.String()).To(HavePrefix("src/api/.env, from acme's feat-x in north1:\n"))
 			Expect(envFile()).To(HavePrefix("STRIPE_KEY=sk_test_123\n"))
 		})
 
 		It("stops rather than signing you in again when Google still refuses you after signing in", func() {
-			tool("gcloud", `[ "$*" = "auth application-default login" ] && exit 0; echo stale-token`)
+			tool("gcloud", `case "$*" in
+  "auth application-default login") : > "$0.signed-in" ;;
+  *) [ -f "$0.signed-in" ] && echo stale-token || exit 1 ;;
+esac`)
 
 			err := run("env", "pull")
 
@@ -199,6 +206,26 @@ esac`)
 
 			Expect(err).To(MatchError("you may not read acme's nonprod-stripe-key in acme-dev; ask to be added to acme's developers"))
 			Expect(filepath.Join(repo, "src", "api", ".env")).NotTo(BeAnExistingFile())
+		})
+
+		It("reads every secret at once", func() {
+			var asked sync.WaitGroup
+			var together atomic.Int32
+			asked.Add(2)
+			secrets.asking = func() {
+				asked.Done()
+				both := make(chan struct{})
+				go func() { asked.Wait(); close(both) }()
+				select {
+				case <-both:
+					together.Add(1)
+				case <-time.After(time.Second):
+				}
+			}
+
+			Expect(run("env", "pull")).To(Succeed())
+
+			Expect(together.Load()).To(BeEquivalentTo(2))
 		})
 
 		It("names a secret the environment expects that its project lacks", func() {
@@ -258,6 +285,7 @@ esac`)
 
 			Expect(envFile()).To(Equal("STRIPE_KEY=sk_test_123\nSECRET_KEY=\"has space #hash\"\n"))
 			Expect(out.String()).To(Equal("src/api/.env, from acme's feat-x in north1:\n  added    STRIPE_KEY\n  added    SECRET_KEY\n"))
+			Expect(errs.String()).To(Equal("Finding where acme runs in north1 and south1…\nAsking north1 which secrets acme's feat-x gets…\nReading 2 of acme's secrets from Google Secret Manager…\n"))
 		})
 
 		It("writes to the env file you name, from the repo's root, when your API reads another", func() {
@@ -334,9 +362,13 @@ func secretEnv(name, secret, key string) map[string]any {
 type fakeSecretManager struct {
 	values  map[string]string
 	refused map[string]bool
+	asking  func()
 }
 
 func (m *fakeSecretManager) serve(w http.ResponseWriter, r *http.Request) {
+	if m.asking != nil {
+		m.asking()
+	}
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/v1/projects/"), "/")
 	name := parts[0] + "/" + parts[2]
 	value, ok := m.values[name]
