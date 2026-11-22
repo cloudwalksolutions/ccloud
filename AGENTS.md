@@ -23,6 +23,10 @@ comes next is in `specs/`.
 - Land work as small, focused pull requests; CI proves validity. Every merge to `main` releases.
 - Edit files only with the Edit/Write tools; never stream edits.
 - Verify behavior with tests, not by hand.
+- Before a PR merges, `make build` it with the OIDC client exported and run its QA steps against
+  the real clusters with `./ccloud`; after it releases, upgrade and run them again.
+- Progress goes to stderr, data to stdout: a wait gets a `step`, and specs give stdout and stderr
+  separate buffers.
 
 ## Commands
 
@@ -50,8 +54,9 @@ spec can reach is restructured away.
 
 ## Configuration and Secrets
 
-The OIDC client is stamped in at release from Actions secrets ([docs/releasing.md](docs/releasing.md)),
-never committed.
+The OIDC client is stamped in at release from Actions secrets, and by `make build` from
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the environment ([docs/releasing.md](docs/releasing.md)),
+never committed. `make build` does not echo them.
 
 ## Maintaining This File
 

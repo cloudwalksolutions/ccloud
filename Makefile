@@ -7,8 +7,12 @@ help:            ## Show this help
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: build
-build:           ## Build ./ccloud (no OIDC client: sign-in needs a release build)
-	go build -o ccloud ./cmd/ccloud
+build:           ## Build ./ccloud; signs in when GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set
+	@echo "go build -o ccloud ./cmd/ccloud"
+	@go build -o ccloud -ldflags "\
+		-X github.com/cloudwalksolutions/ccloud/internal/cloud/cloudwalk.ClientID=$(GOOGLE_CLIENT_ID) \
+		-X github.com/cloudwalksolutions/ccloud/internal/cloud/cloudwalk.ClientSecret=$(GOOGLE_CLIENT_SECRET)" \
+		./cmd/ccloud
 
 .PHONY: lint
 lint:            ## golangci-lint

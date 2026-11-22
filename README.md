@@ -170,13 +170,18 @@ touched. It names each key it added or changed, never a value.
 A build of ccloud serves one cloud. Its regions, their Access hostnames, gateways and pinned CAs,
 the OIDC issuer, the API server's name, the app repo directory and where each environment's
 database is are one `cloud.Cloud` value; `internal/cloud/cloudwalk` is
-CloudWalk's. The OIDC client is stamped in at release from the `GOOGLE_CLIENT_ID` and
-`GOOGLE_CLIENT_SECRET` Actions secrets, so a plain `go build` cannot sign in.
+CloudWalk's. The OIDC client is stamped in from `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`:
+at release from Actions secrets, and by `make build` from your environment, so a plain `go build`
+cannot sign in.
 
 ## Developing
 
 ```sh
 make check   # lint, build, race tests, coverage gate
 ```
+
+To try a branch against your cloud before it releases, export `GOOGLE_CLIENT_ID` and
+`GOOGLE_CLIENT_SECRET` (the client in [docs/releasing.md](docs/releasing.md)), then `make build`
+and run `./ccloud`. It signs you in as the released ccloud does.
 
 Every merge to `main` releases: see [docs/releasing.md](docs/releasing.md).
