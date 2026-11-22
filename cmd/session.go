@@ -16,24 +16,23 @@ import (
 	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
 
-type signIns struct {
+type session struct {
 	gateways sync.Map
 	prompts  sync.Mutex
-	idToken  string
+	id       string
 }
 
-type signInsKey struct{}
+type sessionKey struct{}
 
-func withSignIns(ctx context.Context) context.Context {
-	return context.WithValue(ctx, signInsKey{}, &signIns{})
+func withSession(ctx context.Context) context.Context {
+	return context.WithValue(ctx, sessionKey{}, &session{})
 }
 
-func signInsOf(c *cobra.Command) *signIns {
-	return c.Context().Value(signInsKey{}).(*signIns)
+func sessionOf(c *cobra.Command) *session {
+	return c.Context().Value(sessionKey{}).(*session)
 }
 
-func signInToGateway(c *cobra.Command, home cloud.Cloud, region cloud.Region) (gateway.Gateway, error) {
-	s := signInsOf(c)
+func (s *session) gateway(c *cobra.Command, home cloud.Cloud, region cloud.Region) (gateway.Gateway, error) {
 	if signedIn, ok := s.gateways.Load(region.Name); ok {
 		return signedIn.(gateway.Gateway), nil
 	}
@@ -45,7 +44,7 @@ func signInToGateway(c *cobra.Command, home cloud.Cloud, region cloud.Region) (g
 	if err != nil {
 		return gateway.Gateway{}, err
 	}
-	id, err := s.identityToken(c, home)
+	id, err := s.idToken(c, home)
 	if err != nil {
 		return gateway.Gateway{}, err
 	}
@@ -54,19 +53,18 @@ func signInToGateway(c *cobra.Command, home cloud.Cloud, region cloud.Region) (g
 	return signedIn, nil
 }
 
-func signInAgain(c *cobra.Command, region cloud.Region) {
-	s := signInsOf(c)
+func (s *session) forget(region cloud.Region) {
 	s.gateways.Delete(region.Name)
 	s.prompts.Lock()
 	defer s.prompts.Unlock()
-	s.idToken = ""
+	s.id = ""
 }
 
-func (s *signIns) identityToken(c *cobra.Command, home cloud.Cloud) (string, error) {
+func (s *session) idToken(c *cobra.Command, home cloud.Cloud) (string, error) {
 	s.prompts.Lock()
 	defer s.prompts.Unlock()
-	if s.idToken != "" {
-		return s.idToken, nil
+	if s.id != "" {
+		return s.id, nil
 	}
 	oidc := exec.CommandContext(c.Context(), "kubectl-oidc_login", oidcArgs(home)...)
 	oidc.Stderr = c.ErrOrStderr()
@@ -75,11 +73,11 @@ func (s *signIns) identityToken(c *cobra.Command, home cloud.Cloud) (string, err
 	if err != nil || json.Unmarshal(credential, &exchanged) != nil || exchanged.Status == nil {
 		return "", fmt.Errorf("signing in to %s failed", home.Issuer)
 	}
-	s.idToken = exchanged.Status.Token
-	return s.idToken, nil
+	s.id = exchanged.Status.Token
+	return s.id, nil
 }
 
-func (s *signIns) accessToken(c *cobra.Command, region cloud.Region) (string, error) {
+func (s *session) accessToken(c *cobra.Command, region cloud.Region) (string, error) {
 	token, err := exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+region.Gateway).Output()
 	if err == nil {
 		return strings.TrimSpace(string(token)), nil

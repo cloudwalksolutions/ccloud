@@ -54,7 +54,7 @@ func usagesOf(c *cobra.Command, home cloud.Cloud, name, app, env string) ([]regi
 	}
 	var usages []regionUsage
 	for _, region := range regions {
-		signedIn, err := signInToGateway(c, home, region)
+		signedIn, err := sessionOf(c).gateway(c, home, region)
 		var found []gateway.Usage
 		if err == nil {
 			found, err = signedIn.Resources(c.Context(), app, env)

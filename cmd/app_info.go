@@ -68,7 +68,7 @@ func summarize(c *cobra.Command, home cloud.Cloud, name, app string, weeks int) 
 	if err != nil {
 		return err
 	}
-	signedIn, err := signInToGateway(c, home, region)
+	signedIn, err := sessionOf(c).gateway(c, home, region)
 	var s gateway.Summary
 	if err == nil {
 		s, err = signedIn.Summary(c.Context(), app, weeks)

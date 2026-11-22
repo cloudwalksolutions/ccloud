@@ -93,7 +93,7 @@ func everyRegionsEnvironments(c *cobra.Command, home cloud.Cloud, app string) (m
 	var asking sync.WaitGroup
 	for i, region := range home.Regions {
 		asking.Go(func() {
-			signedIn, err := signInToGateway(c, home, region)
+			signedIn, err := sessionOf(c).gateway(c, home, region)
 			if err == nil {
 				found[i], err = signedIn.Environments(c.Context(), app)
 			}

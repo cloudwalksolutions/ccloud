@@ -49,7 +49,7 @@ func logContainersCmd(home cloud.Cloud) *cobra.Command {
 		Example: "  ccloud logs containers -e stage",
 	}, namedEnv, func(c *cobra.Command, region cloud.Region, app string) error {
 		env, _ := c.Flags().GetString("env")
-		signedIn, err := signInToGateway(c, home, region)
+		signedIn, err := sessionOf(c).gateway(c, home, region)
 		var containers []string
 		if err == nil {
 			containers, err = signedIn.Containers(c.Context(), url.Values{
@@ -156,7 +156,7 @@ func followLogs(c *cobra.Command, reader *logReader, query url.Values, printer l
 			return fmt.Errorf("you may no longer read %s's %s logs in %s", app, env, region.Name)
 		case refused.Status == http.StatusUnauthorized && !signedInAgain:
 			reader.signedIn, signedInAgain = nil, true
-			signInAgain(c, region)
+			sessionOf(c).forget(region)
 			continue
 		case refused.Status >= 400 && refused.Status < 500:
 			return mayNotRead(err, app, env, region)
@@ -245,7 +245,7 @@ func (r *logReader) signIn() error {
 	if r.signedIn != nil {
 		return nil
 	}
-	g, err := signInToGateway(r.c, r.home, r.region)
+	g, err := sessionOf(r.c).gateway(r.c, r.home, r.region)
 	r.signedIn = &g
 	if err != nil {
 		r.signedIn = nil
