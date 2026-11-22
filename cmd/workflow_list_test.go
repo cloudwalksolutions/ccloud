@@ -38,7 +38,7 @@ var _ = Describe("ccloud workflow list", func() {
 	})
 
 	It("sends you to sign in when you have not signed in to the region", func() {
-		err := run("workflow", "list", "-a", "shop", "-r", "north1")
+		err := run("workflow", "list", "-a", "acme", "-r", "north1")
 
 		Expect(err).To(MatchError(ContainSubstring("run ccloud clusters auth --region north1")))
 	})
@@ -50,7 +50,7 @@ var _ = Describe("ccloud workflow list", func() {
 		cfg.Clusters["ccloud-north1"].CertificateAuthorityData = []byte("not a certificate")
 		Expect(clientcmd.WriteToFile(*cfg, os.Getenv("KUBECONFIG"))).To(Succeed())
 
-		err = run("workflow", "list", "-a", "shop", "-r", "north1")
+		err = run("workflow", "list", "-a", "acme", "-r", "north1")
 
 		Expect(err).To(MatchError(HavePrefix("your ccloud-north1 context is damaged; sign in again with ccloud clusters auth --region north1: ")))
 	})
@@ -67,14 +67,14 @@ var _ = Describe("ccloud workflow list", func() {
 	It("says there are none rather than printing an empty table", func() {
 		ci.signIn("north1")
 
-		Expect(run("workflow", "list", "-a", "shop", "-r", "north1")).To(Succeed())
+		Expect(run("workflow", "list", "-a", "acme", "-r", "north1")).To(Succeed())
 
-		Expect(out.String()).To(Equal("No runs for shop in north1.\n"))
+		Expect(out.String()).To(Equal("No runs for acme in north1.\n"))
 	})
 
 	It("lists the app's runs newest first, with their result, pull request, branch and timing", func() {
 		now := time.Now().Truncate(time.Second)
-		ci.workflows("ci-shop",
+		ci.workflows("ci-acme",
 			ciRun("nightly-a1b2c", now.Add(-50*time.Hour)).flow("nightly").finished("Succeeded", time.Minute),
 			ciRun("release-m4k2p", now.Add(-3*time.Hour)).flow("release").finished("Succeeded", 4*time.Minute+12*time.Second),
 			ciRun("api-tests-x7k2p", now.Add(-time.Hour)).flow("api-tests").pr("105", "3f9a2c4e1d", "feat/BOAT-105/search").finished("Failed", 2*time.Minute+3*time.Second),
@@ -83,7 +83,7 @@ var _ = Describe("ccloud workflow list", func() {
 		)
 		ci.signIn("north1")
 
-		Expect(run("workflow", "list", "-a", "shop", "-r", "north1")).To(Succeed())
+		Expect(run("workflow", "list", "-a", "acme", "-r", "north1")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements(
 			MatchRegexp(`^STATUS\s+FLOW\s+PR\s+BRANCH\s+SHA\s+ID\s+ELAPSED\s+AGE$`),
@@ -97,10 +97,10 @@ var _ = Describe("ccloud workflow list", func() {
 
 	It("colors each result when asked to, keeping the columns aligned", func() {
 		GinkgoT().Setenv("CLICOLOR_FORCE", "1")
-		ci.workflows("ci-shop", ciRun("api-tests-x7k2p", time.Now().Add(-time.Hour)).flow("api-tests").finished("Failed", time.Minute))
+		ci.workflows("ci-acme", ciRun("api-tests-x7k2p", time.Now().Add(-time.Hour)).flow("api-tests").finished("Failed", time.Minute))
 		ci.signIn("north1")
 
-		Expect(run("workflow", "list", "-a", "shop", "-r", "north1")).To(Succeed())
+		Expect(run("workflow", "list", "-a", "acme", "-r", "north1")).To(Succeed())
 
 		Expect(out.String()).To(ContainSubstring("\x1b[31mX\x1b[0m"))
 		plain := regexp.MustCompile("\x1b\\[[0-9;]*m").ReplaceAllString(out.String(), "")
@@ -110,7 +110,7 @@ var _ = Describe("ccloud workflow list", func() {
 
 	It("narrows to one flow and pull request, and to the newest few", func() {
 		now := time.Now()
-		ci.workflows("ci-shop",
+		ci.workflows("ci-acme",
 			ciRun("api-tests-old", now.Add(-3*time.Hour)).flow("api-tests").pr("105", "1111111", "feat/a").finished("Failed", time.Minute),
 			ciRun("api-tests-new", now.Add(-2*time.Hour)).flow("api-tests").pr("105", "2222222", "feat/a").finished("Succeeded", time.Minute),
 			ciRun("web-tests-new", now.Add(-time.Hour)).flow("web-tests").pr("105", "2222222", "feat/a").finished("Succeeded", time.Minute),
@@ -118,7 +118,7 @@ var _ = Describe("ccloud workflow list", func() {
 		)
 		ci.signIn("north1")
 
-		Expect(run("workflow", "list", "-a", "shop", "-r", "north1", "--flow", "api-tests", "--pr", "105", "-L", "1")).To(Succeed())
+		Expect(run("workflow", "list", "-a", "acme", "-r", "north1", "--flow", "api-tests", "--pr", "105", "-L", "1")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements(HavePrefix("STATUS"), ContainSubstring("api-tests-new")))
 	})

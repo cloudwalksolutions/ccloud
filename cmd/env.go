@@ -90,13 +90,50 @@ func envPull(c *cobra.Command, home cloud.Cloud) error {
 	}
 	err = errors.Join(os.MkdirAll(filepath.Dir(path), 0o755), os.WriteFile(path, []byte(merged), 0o600))
 	if err == nil {
-		_, err = fmt.Fprintf(c.OutOrStdout(), "%d added, %d changed and %d unchanged in %s, copied from %s's %s in %s.\n",
-			changes.Added, changes.Changed, changes.Unchanged, file, app, env, region.Name)
+		out := c.OutOrStdout()
+		_, err = fmt.Fprint(out, report(paletteFor(out), changes, file, fmt.Sprintf("%s's %s in %s", app, env, region.Name)))
 	}
 	return err
 }
 
+func report(color palette, changes dotenv.Changes, file, source string) string {
+	if len(changes.Added)+len(changes.Changed) == 0 {
+		return file + " already matches " + source + ".\n"
+	}
+	lines := file + ", from " + source + ":\n"
+	for _, name := range changes.Added {
+		lines += "  " + color.paint("32", "added  ") + "  " + name + "\n"
+	}
+	for _, name := range changes.Changed {
+		lines += "  " + color.paint("33", "changed") + "  " + name + "\n"
+	}
+	if changes.Unchanged > 0 {
+		lines += fmt.Sprintf("%d unchanged.\n", changes.Unchanged)
+	}
+	return lines
+}
+
+var errNoGoogleSignIn = errors.New("no Google sign-in")
+
 func fetch(c *cobra.Command, home cloud.Cloud, app string, secrets []externalsecrets.Secret) ([]dotenv.Var, error) {
+	vars, err := read(c, home, app, secrets)
+	if !errors.Is(err, errNoGoogleSignIn) {
+		return vars, err
+	}
+	fmt.Fprintf(c.OutOrStdout(), "Signing you in to Google to read %s's secrets.\n", app)
+	login := exec.CommandContext(c.Context(), "gcloud", "auth", "application-default", "login")
+	login.Stdin, login.Stdout, login.Stderr = c.InOrStdin(), c.OutOrStdout(), c.ErrOrStderr()
+	if login.Run() != nil {
+		return nil, errors.New("signing in to Google failed, so nothing was pulled")
+	}
+	vars, err = read(c, home, app, secrets)
+	if errors.Is(err, errNoGoogleSignIn) {
+		return nil, fmt.Errorf("your Google sign-in was refused for %s's secrets, so nothing was pulled", app)
+	}
+	return vars, err
+}
+
+func read(c *cobra.Command, home cloud.Cloud, app string, secrets []externalsecrets.Secret) ([]dotenv.Var, error) {
 	token, _ := exec.CommandContext(c.Context(), "gcloud", "auth", "application-default", "print-access-token").Output()
 	manager := secretmanager.Client{URL: home.Env.SecretManager, Token: strings.TrimSpace(string(token))}
 	vars := make([]dotenv.Var, len(secrets))
@@ -106,7 +143,7 @@ func fetch(c *cobra.Command, home cloud.Cloud, app string, secrets []externalsec
 		vars[i].Name = secret.Env
 		vars[i].Value, err = manager.Access(c.Context(), secret.Project, secret.Name)
 		if errors.Is(err, secretmanager.StatusError{Code: http.StatusUnauthorized}) {
-			return nil, fmt.Errorf("reading %s's secrets needs your Google sign-in; run gcloud auth application-default login", app)
+			return nil, errNoGoogleSignIn
 		}
 		if errors.Is(err, secretmanager.StatusError{Code: http.StatusForbidden}) {
 			denied = append(denied, secret.Name)

@@ -29,12 +29,12 @@ var _ = Describe("ccloud workflow rerun", func() {
 	})
 
 	It("says so when the cluster does not let you start the app's runs", func() {
-		ci.workflows("ci-shop", ciRun("api-tests-x7k2p", time.Now().Add(-time.Hour)).flow("api-tests").finished("Failed", time.Minute))
-		ci.readOnly("ci-shop")
+		ci.workflows("ci-acme", ciRun("api-tests-x7k2p", time.Now().Add(-time.Hour)).flow("api-tests").finished("Failed", time.Minute))
+		ci.readOnly("ci-acme")
 
-		err := run("workflow", "rerun", "api-tests-x7k2p", "-a", "shop", "-r", "north1")
+		err := run("workflow", "rerun", "api-tests-x7k2p", "-a", "acme", "-r", "north1")
 
-		Expect(err).To(MatchError("you may not cancel or rerun shop's runs in north1 (ci-shop)"))
+		Expect(err).To(MatchError("you may not cancel or rerun acme's runs in north1 (ci-acme)"))
 	})
 
 	It("starts a new run of the same flow, for the same pull request and commit, without Argo's own bookkeeping", func() {
@@ -44,9 +44,9 @@ var _ = Describe("ccloud workflow rerun", func() {
 		original["metadata"].(map[string]any)["generateName"] = "api-tests-"
 		original["spec"].(map[string]any)["workflowTemplateRef"] = map[string]any{"name": "api-tests"}
 		original["spec"].(map[string]any)["shutdown"] = "Stop"
-		ci.workflows("ci-shop", original)
+		ci.workflows("ci-acme", original)
 
-		Expect(run("workflow", "rerun", "api-tests-x7k2p", "-a", "shop", "-r", "north1")).To(Succeed())
+		Expect(run("workflow", "rerun", "api-tests-x7k2p", "-a", "acme", "-r", "north1")).To(Succeed())
 
 		Expect(ci.writes).To(HaveLen(1))
 		Expect(ci.writes[0].method).To(Equal("POST"))
@@ -62,6 +62,6 @@ var _ = Describe("ccloud workflow rerun", func() {
 				"workflowTemplateRef": map[string]any{"name": "api-tests"},
 			},
 		}))
-		Expect(out.String()).To(Equal("Started api-tests-r3run, a rerun of api-tests-x7k2p. Follow it with: ccloud workflow watch api-tests-r3run -a shop -r north1\n"))
+		Expect(out.String()).To(Equal("Started api-tests-r3run, a rerun of api-tests-x7k2p. Follow it with: ccloud workflow watch api-tests-r3run -a acme -r north1\n"))
 	})
 })
