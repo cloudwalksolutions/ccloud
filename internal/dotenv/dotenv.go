@@ -10,8 +10,9 @@ type Var struct {
 }
 
 type Changes struct {
-	Added, Changed, Unchanged int
-	Differ                    []Difference
+	Added, Changed []string
+	Unchanged      int
+	Differ         []Difference
 }
 
 type Difference struct {
@@ -36,7 +37,7 @@ func Merge(existing string, vars []Var, force bool) (string, Changes) {
 		at, ok := defined[v.Name]
 		if !ok {
 			lines = append(lines, line)
-			changes.Added++
+			changes.Added = append(changes.Added, v.Name)
 			continue
 		}
 		_, was, _ := strings.Cut(lines[at], "=")
@@ -46,7 +47,7 @@ func Merge(existing string, vars []Var, force bool) (string, Changes) {
 			changes.Unchanged++
 		case force:
 			lines[at] = line
-			changes.Changed++
+			changes.Changed = append(changes.Changed, v.Name)
 		default:
 			changes.Differ = append(changes.Differ, Difference{Name: v.Name, Was: was, Is: v.Value})
 		}

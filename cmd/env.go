@@ -90,10 +90,26 @@ func envPull(c *cobra.Command, home cloud.Cloud) error {
 	}
 	err = errors.Join(os.MkdirAll(filepath.Dir(path), 0o755), os.WriteFile(path, []byte(merged), 0o600))
 	if err == nil {
-		_, err = fmt.Fprintf(c.OutOrStdout(), "%d added, %d changed and %d unchanged in %s, copied from %s's %s in %s.\n",
-			changes.Added, changes.Changed, changes.Unchanged, file, app, env, region.Name)
+		_, err = fmt.Fprint(c.OutOrStdout(), report(changes, file, fmt.Sprintf("%s's %s in %s", app, env, region.Name)))
 	}
 	return err
+}
+
+func report(changes dotenv.Changes, file, source string) string {
+	if len(changes.Added)+len(changes.Changed) == 0 {
+		return file + " already matches " + source + ".\n"
+	}
+	lines := file + ", from " + source + ":\n"
+	for _, name := range changes.Added {
+		lines += "  added    " + name + "\n"
+	}
+	for _, name := range changes.Changed {
+		lines += "  changed  " + name + "\n"
+	}
+	if changes.Unchanged > 0 {
+		lines += fmt.Sprintf("%d unchanged.\n", changes.Unchanged)
+	}
+	return lines
 }
 
 func fetch(c *cobra.Command, home cloud.Cloud, app string, secrets []externalsecrets.Secret) ([]dotenv.Var, error) {

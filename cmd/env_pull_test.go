@@ -201,7 +201,7 @@ var _ = Describe("ccloud env pull", func() {
 
 			Expect(run("env", "pull", "-e", "feat-x")).To(Succeed())
 
-			Expect(out.String()).To(HavePrefix("2 added"))
+			Expect(out.String()).To(HavePrefix("src/api/.env, from shop's feat-x in north1:\n"))
 		})
 
 		It("sends you to sign in to the region running the environment", func() {
@@ -236,7 +236,7 @@ var _ = Describe("ccloud env pull", func() {
 			Expect(run("env", "pull")).To(Succeed())
 
 			Expect(envFile()).To(Equal("STRIPE_KEY=sk_test_123\nSECRET_KEY=\"has space #hash\"\n"))
-			Expect(out.String()).To(Equal("2 added, 0 changed and 0 unchanged in src/api/.env, copied from shop's feat-x in north1.\n"))
+			Expect(out.String()).To(Equal("src/api/.env, from shop's feat-x in north1:\n  added    STRIPE_KEY\n  added    SECRET_KEY\n"))
 		})
 
 		It("writes to the env file you name, from the repo's root, when your API reads another", func() {
@@ -248,7 +248,7 @@ var _ = Describe("ccloud env pull", func() {
 			written, err := os.ReadFile(filepath.Join(repo, "server", ".env.local"))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(written)).To(HavePrefix("STRIPE_KEY=sk_test_123\n"))
-			Expect(out.String()).To(HavePrefix("2 added, 0 changed and 0 unchanged in server/.env.local,"))
+			Expect(out.String()).To(HavePrefix("server/.env.local, from shop's feat-x in north1:\n"))
 		})
 
 		It("adds only what your env file lacks, leaving your own settings and notes as they are", func() {
@@ -257,7 +257,15 @@ var _ = Describe("ccloud env pull", func() {
 			Expect(run("env", "pull")).To(Succeed())
 
 			Expect(envFile()).To(Equal("# local\nDB_HOST=localhost\nSECRET_KEY=\"has space #hash\"\nSTRIPE_KEY=sk_test_123\n"))
-			Expect(out.String()).To(HavePrefix("1 added, 0 changed and 1 unchanged in src/api/.env"))
+			Expect(out.String()).To(Equal("src/api/.env, from shop's feat-x in north1:\n  added    STRIPE_KEY\n1 unchanged.\n"))
+		})
+
+		It("says your env file already matches when it has every value", func() {
+			writeEnvFile("STRIPE_KEY=sk_test_123\nSECRET_KEY=\"has space #hash\"\n")
+
+			Expect(run("env", "pull")).To(Succeed())
+
+			Expect(out.String()).To(Equal("src/api/.env already matches shop's feat-x in north1.\n"))
 		})
 
 		It("starts its additions on their own line when your file's last line has no newline", func() {
@@ -283,7 +291,7 @@ var _ = Describe("ccloud env pull", func() {
 			Expect(run("env", "pull", "--force")).To(Succeed())
 
 			Expect(envFile()).To(Equal("# mine\nSTRIPE_KEY=sk_test_123\nOTHER=1\nSECRET_KEY=\"has space #hash\"\n"))
-			Expect(out.String()).To(HavePrefix("1 added, 1 changed and 0 unchanged in src/api/.env"))
+			Expect(out.String()).To(Equal("src/api/.env, from shop's feat-x in north1:\n  added    SECRET_KEY\n  changed  STRIPE_KEY\n"))
 		})
 	})
 })
