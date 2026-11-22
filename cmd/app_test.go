@@ -17,13 +17,13 @@ import (
 
 var _ = Describe("ccloud app", func() {
 	var (
-		out          *bytes.Buffer
+		out, errs    *bytes.Buffer
 		north, south *fakeGateway
 		home         cloud.Cloud
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, home, "dev")
+		return cmd.Run(args, out, errs, home, "dev")
 	}
 
 	serve := func(g *fakeGateway) string {
@@ -33,7 +33,7 @@ var _ = Describe("ccloud app", func() {
 	}
 
 	BeforeEach(func() {
-		out = &bytes.Buffer{}
+		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		north = &fakeGateway{hosts: []string{"ci", "boat-105"}}
 		south = &fakeGateway{hosts: []string{"prod"}}
 		home = example

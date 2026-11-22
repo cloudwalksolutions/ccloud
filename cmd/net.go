@@ -21,7 +21,7 @@ func netCmd(home cloud.Cloud) *cobra.Command {
 	}, namedEnv, func(c *cobra.Command, region cloud.Region, app string) error {
 		env, _ := c.Flags().GetString("env")
 		since, _ := c.Flags().GetDuration("since")
-		signedIn, err := signInToGateway(c, home, region)
+		signedIn, err := sessionOf(c).gateway(c, home, region)
 		var seen gateway.Traffic
 		if err == nil {
 			seen, err = signedIn.Network(c.Context(), app, env, since)

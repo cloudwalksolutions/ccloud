@@ -28,6 +28,7 @@ type Gateway struct {
 	URL         *url.URL
 	AccessToken string
 	IDToken     string
+	Timeout     time.Duration
 }
 
 type Refused struct {
@@ -104,7 +105,13 @@ func (g Gateway) Stream(ctx context.Context, query url.Values, each func(Entry) 
 }
 
 func (g Gateway) get(ctx context.Context, path *url.URL, what string, into any) error {
-	resp, err := g.open(ctx, path)
+	timeout := cmp.Or(g.Timeout, 15*time.Second)
+	answering, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	resp, err := g.open(answering, path)
+	if ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("the gateway did not answer within %s", timeout)
+	}
 	if err != nil {
 		return err
 	}

@@ -6,6 +6,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -65,12 +69,86 @@ var _ = Describe("finding the region", func() {
 		Expect(south.asked[0].URL.Query().Get("namespace")).To(Equal("prod-acme"))
 	})
 
+	It("asks every region at once", func() {
+		var asked sync.WaitGroup
+		var together atomic.Int32
+		asked.Add(2)
+		meet := func() {
+			asked.Done()
+			both := make(chan struct{})
+			go func() { asked.Wait(); close(both) }()
+			select {
+			case <-both:
+				together.Add(1)
+			case <-time.After(time.Second):
+			}
+		}
+		north.asking, south.asking = meet, meet
+
+		Expect(run("logs", "-a", "acme", "-e", "prod")).To(Succeed())
+
+		Expect(together.Load()).To(BeEquivalentTo(2))
+	})
+
+	It("signs you in once for every region it asks, and once to the region it then reads", func() {
+		calls := filepath.Join(GinkgoT().TempDir(), "calls")
+		tool(os.Getenv("PATH"), "kubectl-oidc_login", `echo oidc >> `+calls+`
+echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
+		tool(os.Getenv("PATH"), "cloudflared", `echo "$2 $3" >> `+calls+`
+[ "$1 $2" = "access token" ] && echo access-jwt`)
+
+		Expect(run("logs", "-a", "acme", "-e", "prod")).To(Succeed())
+
+		Expect(os.ReadFile(calls)).To(SatisfyAll(
+			WithTransform(func(b []byte) int { return strings.Count(string(b), "oidc") }, Equal(1)),
+			WithTransform(func(b []byte) int { return strings.Count(string(b), "token --app=") }, Equal(2)),
+		))
+	})
+
+	It("opens one Cloudflare sign-in at a time when no region has signed you in", func() {
+		signedIn := GinkgoT().TempDir()
+		logins := filepath.Join(signedIn, "logins")
+		tool(os.Getenv("PATH"), "cloudflared", `case "$1 $2" in
+"access token") [ -e "`+signedIn+`/${3##*:}" ] && echo access-jwt ;;
+"access login") echo start >> `+logins+`
+  i=0; while [ $i -lt 20000 ]; do i=$((i+1)); done
+  echo end >> `+logins+`
+  : > "`+signedIn+`/${4##*:}" ;;
+esac`)
+
+		Expect(run("logs", "-a", "acme", "-e", "prod")).To(Succeed())
+
+		Expect(os.ReadFile(logins)).To(BeEquivalentTo("start\nend\nstart\nend\n"))
+	})
+
+	It("spins while it asks the regions on a terminal, then ticks off where the app runs", func() {
+		GinkgoT().Setenv("CCLOUD_FORCE_TTY", "1")
+		south.slow = 250 * time.Millisecond
+
+		Expect(run("logs", "-a", "acme", "-e", "prod")).To(Succeed())
+
+		Expect(out.String()).To(HavePrefix("\r\x1b[K⠋ Finding where acme runs in north1 and south1…\r\x1b[K⠙ Finding where acme runs in north1 and south1…"))
+		Expect(out.String()).To(ContainSubstring("\r\x1b[K\x1b[32m✓\x1b[0m acme runs in north1 and south1\n"))
+	})
+
+	It("clears the spinner off the line when a sign-in prompts you", func() {
+		GinkgoT().Setenv("CCLOUD_FORCE_TTY", "1")
+		tool(os.Getenv("PATH"), "kubectl-oidc_login", `echo 'Open http://localhost:8000 to sign in' >&2
+echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
+
+		Expect(run("logs", "-a", "acme", "-e", "prod")).To(Succeed())
+
+		Expect(out.String()).To(ContainSubstring("…\r\x1b[KOpen http://localhost:8000 to sign in\n"))
+	})
+
 	It("names the region it could not ask, and how to go without asking", func() {
+		GinkgoT().Setenv("CCLOUD_FORCE_TTY", "1")
 		north.refuse = http.StatusBadGateway
 
 		err := run("logs", "-a", "acme", "-e", "prod")
 
 		Expect(err).To(MatchError(And(HavePrefix("asking north1 where acme runs: the gateway answered 502"), HaveSuffix("; or name the region with --region"))))
+		Expect(out.String()).To(HaveSuffix("\r\x1b[K\x1b[31mX\x1b[0m Finding where acme runs in north1 and south1\n"))
 	})
 
 	It("reads CI runs from the region that hosts the app's CI", func() {
@@ -79,7 +157,7 @@ var _ = Describe("finding the region", func() {
 
 		Expect(run("workflow", "list", "-a", "acme")).To(Succeed())
 
-		Expect(out.String()).To(Equal("No runs for acme in north1.\n"))
+		Expect(out.String()).To(Equal("Finding where acme runs in north1 and south1…\nNo runs for acme in north1.\n"))
 	})
 
 	It("signs you in to every region that hosts the repo's app", func() {
@@ -100,6 +178,15 @@ var _ = Describe("finding the region", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cfg.Contexts).To(HaveKey("ccloud-north1"))
 		Expect(cfg.Contexts).To(HaveKey("ccloud-south1"))
+	})
+
+	It("gives up on a region whose gateway does not answer in time", func() {
+		home.GatewayTimeout = 100 * time.Millisecond
+		north.slow = time.Second
+
+		err := run("logs", "-a", "acme", "-e", "prod")
+
+		Expect(err).To(MatchError("asking north1 where acme runs: the gateway did not answer within 100ms; or name the region with --region"))
 	})
 
 	It("asks you to choose when more than one region hosts the environment", func() {

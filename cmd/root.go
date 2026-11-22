@@ -32,7 +32,7 @@ func RunContext(ctx context.Context, args []string, stdout, stderr io.Writer, ho
 	root.SetArgs(args)
 	root.SetOut(stdout)
 	root.SetErr(stderr)
-	err := root.ExecuteContext(ctx)
+	err := root.ExecuteContext(withSession(ctx))
 	if !asksVersion && checks && dueForUpdateCheck() {
 		fmt.Fprint(stderr, newerRelease(home, running))
 	}

@@ -19,14 +19,14 @@ import (
 
 var _ = Describe("ccloud env pull", func() {
 	var (
-		out          *bytes.Buffer
+		out, errs    *bytes.Buffer
 		north, south *fakeGateway
 		home         cloud.Cloud
 		bin          string
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, home, "dev")
+		return cmd.Run(args, out, errs, home, "dev")
 	}
 
 	in := func(dir string) {
@@ -47,7 +47,7 @@ var _ = Describe("ccloud env pull", func() {
 	}
 
 	BeforeEach(func() {
-		out = &bytes.Buffer{}
+		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		GinkgoT().Setenv("KUBECONFIG", filepath.Join(GinkgoT().TempDir(), "config"))
 		north = &fakeGateway{hosts: []string{"ci", "stage"}}
 		south = &fakeGateway{hosts: []string{"prod"}}
