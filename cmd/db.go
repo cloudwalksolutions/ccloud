@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"sync"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -52,17 +53,9 @@ func dbTunnel(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 	if env == "prod" {
 		cautionAboutProd(c.ErrOrStderr(), app)
 	}
-	db, err := connect(region, func(cfg *rest.Config) (database.Database, error) { return database.In(cfg, env+"-"+app, home.Database) })
+	db, owner, pod, err := primaryOf(c, home, region, app, env)
 	if err != nil {
 		return err
-	}
-	owner, err := db.Credentials(c.Context())
-	if err != nil {
-		return errMayNotTunnel(err, region, app, env)
-	}
-	pod, err := db.Primary(c.Context())
-	if err != nil {
-		return fmt.Errorf("%s's %s database has %w in %s", app, env, err, region.Name)
 	}
 	port, _ := c.Flags().GetInt("port")
 	if port == 0 {
@@ -76,12 +69,35 @@ func dbTunnel(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 	if background, _ := c.Flags().GetBool("background"); background {
 		return openInBackground(c, opened)
 	}
+	done := step(c, fmt.Sprintf("Opening localhost:%d to %s's %s database", port, app, env))
+	var finished sync.Once
 	ready := make(chan struct{})
 	go func() {
 		<-ready
+		finished.Do(func() { done(nil, fmt.Sprintf("Opened localhost:%d", port)) })
 		_ = opened.print(c.OutOrStdout(), "Ctrl-C")
 	}()
-	return db.Forward(c.Context(), pod, port, ready, c.ErrOrStderr())
+	err = db.Forward(c.Context(), pod, port, ready, c.ErrOrStderr())
+	finished.Do(func() { done(err, "") })
+	return err
+}
+
+func primaryOf(c *cobra.Command, home cloud.Cloud, region cloud.Region, app, env string) (db database.Database, owner database.Credentials, pod string, err error) {
+	done := step(c, fmt.Sprintf("Reading %s's %s database credentials in %s", app, env, region.Name))
+	defer func() { done(err, fmt.Sprintf("Read %s's %s database credentials", app, env)) }()
+	db, err = connect(region, func(cfg *rest.Config) (database.Database, error) { return database.In(cfg, env+"-"+app, home.Database) })
+	if err != nil {
+		return db, owner, "", err
+	}
+	owner, err = db.Credentials(c.Context())
+	if err != nil {
+		return db, owner, "", errMayNotTunnel(err, region, app, env)
+	}
+	pod, err = db.Primary(c.Context())
+	if err != nil {
+		return db, owner, "", fmt.Errorf("%s's %s database has %w in %s", app, env, err, region.Name)
+	}
+	return db, owner, pod, nil
 }
 
 func (t dbConnection) print(out io.Writer, closer string) error {

@@ -15,16 +15,16 @@ import (
 
 var _ = Describe("ccloud workflow watch", func() {
 	var (
-		out *bytes.Buffer
-		ci  *fakeCluster
+		out, errs *bytes.Buffer
+		ci        *fakeCluster
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, example, "dev")
+		return cmd.Run(args, out, errs, example, "dev")
 	}
 
 	BeforeEach(func() {
-		out = &bytes.Buffer{}
+		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		GinkgoT().Setenv("KUBECONFIG", filepath.Join(GinkgoT().TempDir(), "config"))
 		ci = newFakeCluster()
 		ci.signIn("north1")
@@ -70,6 +70,22 @@ var _ = Describe("ccloud workflow watch", func() {
 		Expect(screens[1]).To(ContainSubstring("Looking again every 1ms; Ctrl-C stops watching, not the run."))
 		Expect(screens[2]).To(ContainSubstring("✓ lint in 41s"))
 		Expect(screens[2]).To(HaveSuffix("✓ api-tests-x7k2p completed: Succeeded\n"))
+	})
+
+	It("prints each step on stderr as its phase changes when not on a terminal, so a log shows the run moving", func() {
+		started := time.Now().Add(-time.Minute)
+		ci.progress("ci-acme",
+			ciRun("api-tests-x7k2p", started).flow("api-tests").running().
+				step("api-tests-x7k2p-1", "lint", "Running", started, 0, ""),
+			ciRun("api-tests-x7k2p", started).flow("api-tests").running().
+				step("api-tests-x7k2p-1", "lint", "Running", started, 0, ""),
+			ciRun("api-tests-x7k2p", started).flow("api-tests").finished("Succeeded", time.Minute).
+				step("api-tests-x7k2p-1", "lint", "Succeeded", started, 41*time.Second, ""),
+		)
+
+		Expect(run("workflow", "watch", "api-tests-x7k2p", "-a", "acme", "-r", "north1", "-i", "1ms")).To(Succeed())
+
+		Expect(errs.String()).To(MatchRegexp(`^Reading api-tests-x7k2p in north1…\n\d\d:\d\d:\d\d lint Running\n\d\d:\d\d:\d\d lint Succeeded\n$`))
 	})
 
 	It("stops watching at once when you press Ctrl-C, without calling it a failure", func(ctx SpecContext) {

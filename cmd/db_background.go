@@ -22,7 +22,10 @@ func openInBackground(c *cobra.Command, opened dbConnection) error {
 	self, _ := os.Executable()
 	port := strconv.Itoa(opened.port)
 	forward := exec.Command(self, "db", "tunnel", "-e", opened.env, "-a", opened.app, "-r", opened.region.Name, "-p", port)
-	if err := detach(c.Context(), forward, "localhost:"+port, "the tunnel to "+opened.app+"'s "+opened.env+" database"); err != nil {
+	done := step(c, fmt.Sprintf("Starting a tunnel to %s's %s database in the background", opened.app, opened.env))
+	err := detach(c.Context(), forward, "localhost:"+port, "the tunnel to "+opened.app+"'s "+opened.env+" database")
+	done(err, "Started a tunnel on localhost:"+port)
+	if err != nil {
 		return fmt.Errorf("%w; run it without --background to see why", err)
 	}
 	recorded := errors.Join(os.MkdirAll(filepath.Dir(pidFile), 0o700), os.WriteFile(pidFile, []byte(strconv.Itoa(forward.Process.Pid)), 0o600))

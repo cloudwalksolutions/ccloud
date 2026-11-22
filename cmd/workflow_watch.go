@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,15 +19,27 @@ func workflowWatch(c *cobra.Command, region cloud.Region, app string, runs workf
 	return follow(c, region, app, runs, run, interval, strict)
 }
 
+func printChanges(out io.Writer, run workflows.Run, phases map[string]string) {
+	for _, step := range run.Steps() {
+		if phases[step.ID] != step.Phase {
+			phases[step.ID] = step.Phase
+			fmt.Fprintf(out, "%s %s %s\n", time.Now().Format(time.TimeOnly), step.DisplayName, step.Phase)
+		}
+	}
+}
+
 func follow(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs, run workflows.Run, interval time.Duration, strict bool) error {
 	out := c.OutOrStdout()
 	redraw := terminal(out)
+	phases := map[string]string{}
 	var err error
 	for err == nil && run.Status.FinishedAt.IsZero() {
 		if redraw {
 			fmt.Fprint(out, clearScreen)
 			render(out, run, time.Now())
 			fmt.Fprintf(out, "\nLooking again every %s; Ctrl-C stops watching, not the run.\n", interval)
+		} else {
+			printChanges(c.ErrOrStderr(), run, phases)
 		}
 		select {
 		case <-c.Context().Done():
@@ -37,6 +50,9 @@ func follow(c *cobra.Command, region cloud.Region, app string, runs workflows.Ru
 	}
 	if err != nil {
 		return err
+	}
+	if !redraw {
+		printChanges(c.ErrOrStderr(), run, phases)
 	}
 	if redraw {
 		fmt.Fprint(out, clearScreen)

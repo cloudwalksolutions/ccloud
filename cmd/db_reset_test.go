@@ -14,16 +14,16 @@ import (
 
 var _ = Describe("ccloud db reset", func() {
 	var (
-		out     *bytes.Buffer
-		cluster *fakeCluster
+		out, errs *bytes.Buffer
+		cluster   *fakeCluster
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, example, "dev")
+		return cmd.Run(args, out, errs, example, "dev")
 	}
 
 	BeforeEach(func() {
-		out = &bytes.Buffer{}
+		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		GinkgoT().Setenv("KUBECONFIG", filepath.Join(GinkgoT().TempDir(), "config"))
 		cluster = newFakeCluster()
 		cluster.signIn("north1")
@@ -90,6 +90,7 @@ var _ = Describe("ccloud db reset", func() {
 			"spec":       map[string]any{"workflowTemplateRef": map[string]any{"name": "db-reset"}},
 		}))
 		Expect(lines(out)).To(ContainElement("✓ db-reset-r3run completed: Succeeded"))
+		Expect(errs.String()).To(Equal("Submitted db-reset-r3run; following it until the database is migrated and seeded again. Ctrl-C stops watching, not the reset.\n"))
 	})
 })
 

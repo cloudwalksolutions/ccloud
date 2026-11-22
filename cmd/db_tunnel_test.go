@@ -19,18 +19,18 @@ var _ = Describe("ccloud db tunnel", func() {
 	owner := map[string]string{"user": "acme", "password": "s3cr3t/pa55", "dbname": "acmedb"}
 
 	var (
-		out     *gbytes.Buffer
-		cluster *fakeCluster
+		out, errs *gbytes.Buffer
+		cluster   *fakeCluster
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, example, "dev")
+		return cmd.Run(args, out, errs, example, "dev")
 	}
 
 	open := func(args ...string) {
 		ctx, closeTunnel := context.WithCancel(context.Background())
 		closed := make(chan error, 1)
-		go func() { closed <- cmd.RunContext(ctx, args, out, out, example, "dev") }()
+		go func() { closed <- cmd.RunContext(ctx, args, out, errs, example, "dev") }()
 		DeferCleanup(func() {
 			closeTunnel()
 			Eventually(closed).Should(Receive(BeNil()))
@@ -57,7 +57,7 @@ var _ = Describe("ccloud db tunnel", func() {
 	}
 
 	BeforeEach(func() {
-		out = gbytes.NewBuffer()
+		out, errs = gbytes.NewBuffer(), gbytes.NewBuffer()
 		GinkgoT().Setenv("KUBECONFIG", filepath.Join(GinkgoT().TempDir(), "config"))
 		GinkgoT().Setenv("HOME", GinkgoT().TempDir())
 		GinkgoT().Setenv("XDG_CACHE_HOME", GinkgoT().TempDir())
@@ -85,11 +85,12 @@ var _ = Describe("ccloud db tunnel", func() {
 		err := run("db", "tunnel", "-e", "prod", "-a", "acme", "-r", "north1")
 
 		Expect(err).To(MatchError("you may not tunnel into acme's prod database in north1"))
-		Expect(string(out.Contents())).To(Equal(
+		Expect(string(errs.Contents())).To(Equal(
 			"CAUTION: this is acme's production database, and its only primary.\n" +
 				"  - Every query adds load to the live app: keep them small and indexed.\n" +
 				"  - A write changes real data at once, and nothing here undoes it.\n" +
-				"  - Reads show customers' personal data: select only what you need.\n"))
+				"  - Reads show customers' personal data: select only what you need.\n" +
+				"Reading acme's prod database credentials in north1…\n"))
 	})
 
 	It("says so when the environment has no database", func() {
@@ -123,6 +124,7 @@ var _ = Describe("ccloud db tunnel", func() {
 				"  user      acme\n" +
 				"  password  s3cr…\n" +
 				"  url       postgres://acme:s3cr…@localhost:" + port + "/acmedb\n"))
+		Expect(string(errs.Contents())).To(Equal("Reading acme's stage database credentials in north1…\nOpening localhost:" + port + " to acme's stage database…\n"))
 		Expect(roundTrip(port)).To(Equal("SELECT 1"))
 		Expect(cluster.forwarded).To(Receive(Equal("stage-acme/db-0:5432")))
 	})
@@ -165,6 +167,7 @@ var _ = Describe("ccloud db tunnel", func() {
 				"  password  s3cr…\n" +
 				"  url       postgres://acme:s3cr…@localhost:" + port + "/acmedb\n" +
 				"\nAI agents: this reaches acme's real stage data. Review every write, and every read of sensitive data, with the user before running it.\n"))
+		Expect(string(errs.Contents())).To(Equal("Reading acme's stage database credentials in north1…\nStarting a tunnel to acme's stage database in the background…\n"))
 		Expect(roundTrip(port)).To(Equal("SELECT 1"))
 
 		out = gbytes.NewBuffer()

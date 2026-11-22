@@ -17,16 +17,16 @@ import (
 
 var _ = Describe("ccloud workflow list", func() {
 	var (
-		out *bytes.Buffer
-		ci  *fakeCluster
+		out, errs *bytes.Buffer
+		ci        *fakeCluster
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, example, "dev")
+		return cmd.Run(args, out, errs, example, "dev")
 	}
 
 	BeforeEach(func() {
-		out = &bytes.Buffer{}
+		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		GinkgoT().Setenv("KUBECONFIG", filepath.Join(GinkgoT().TempDir(), "config"))
 		ci = newFakeCluster()
 	})
@@ -62,6 +62,7 @@ var _ = Describe("ccloud workflow list", func() {
 		err := run("workflow", "list", "-a", "other", "-r", "north1")
 
 		Expect(err).To(MatchError(`you may not read other's runs in north1 (ci-other)`))
+		Expect(errs.String()).To(Equal("Reading other's runs in north1…\n"))
 	})
 
 	It("says there are none rather than printing an empty table", func() {

@@ -41,6 +41,7 @@ func dbReset(c *cobra.Command, home cloud.Cloud, region cloud.Region, app string
 	name, err := runs.Submit(c.Context(), home.Database.Reset)
 	var run workflows.Run
 	if err == nil {
+		fmt.Fprintf(c.ErrOrStderr(), "Submitted %s; following it until the database is migrated and seeded again. Ctrl-C stops watching, not the reset.\n", name)
 		run, err = getRun(c, runs, region, app, name)
 	}
 	if err == nil {

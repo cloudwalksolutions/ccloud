@@ -157,7 +157,7 @@ echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
 
 		Expect(run("workflow", "list", "-a", "acme")).To(Succeed())
 
-		Expect(out.String()).To(Equal("Finding where acme runs in north1 and south1…\nNo runs for acme in north1.\n"))
+		Expect(out.String()).To(Equal("Finding where acme runs in north1 and south1…\nReading acme's runs in north1…\nNo runs for acme in north1.\n"))
 	})
 
 	It("signs you in to every region that hosts the repo's app", func() {

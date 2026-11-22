@@ -13,16 +13,16 @@ import (
 
 var _ = Describe("ccloud workflow rerun", func() {
 	var (
-		out *bytes.Buffer
-		ci  *fakeCluster
+		out, errs *bytes.Buffer
+		ci        *fakeCluster
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, example, "dev")
+		return cmd.Run(args, out, errs, example, "dev")
 	}
 
 	BeforeEach(func() {
-		out = &bytes.Buffer{}
+		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		GinkgoT().Setenv("KUBECONFIG", filepath.Join(GinkgoT().TempDir(), "config"))
 		ci = newFakeCluster()
 		ci.signIn("north1")

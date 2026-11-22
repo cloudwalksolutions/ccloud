@@ -18,19 +18,19 @@ import (
 
 var _ = Describe("ccloud workflow logs", func() {
 	var (
-		out     *bytes.Buffer
-		ci      *fakeCluster
-		gateway *fakeGateway
-		home    cloud.Cloud
-		started time.Time
+		out, errs *bytes.Buffer
+		ci        *fakeCluster
+		gateway   *fakeGateway
+		home      cloud.Cloud
+		started   time.Time
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, home, "dev")
+		return cmd.Run(args, out, errs, home, "dev")
 	}
 
 	BeforeEach(func() {
-		out = &bytes.Buffer{}
+		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		GinkgoT().Setenv("KUBECONFIG", filepath.Join(GinkgoT().TempDir(), "config"))
 		ci = newFakeCluster()
 		ci.signIn("north1")
@@ -113,6 +113,7 @@ var _ = Describe("ccloud workflow logs", func() {
 		Expect(run("workflow", "logs", "api-tests-x7k2p", "-a", "acme", "-r", "north1")).To(Succeed())
 
 		Expect(lines(out)).To(HaveExactElements("lint\tok 12 files", "unit\tFAIL auth", "unit\texit 1"))
+		Expect(errs.String()).To(Equal("Reading api-tests-x7k2p in north1…\nReading lint's log…\nReading unit's log…\nReading unit's kept log from north1's gateway…\n"))
 		Expect(gateway.asked).To(HaveLen(1))
 		query := gateway.asked[0].URL.Query()
 		Expect(query["namespace"]).To(Equal([]string{"ci-acme"}))

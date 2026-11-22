@@ -13,16 +13,16 @@ import (
 
 var _ = Describe("ccloud workflow view", func() {
 	var (
-		out *bytes.Buffer
-		ci  *fakeCluster
+		out, errs *bytes.Buffer
+		ci        *fakeCluster
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, example, "dev")
+		return cmd.Run(args, out, errs, example, "dev")
 	}
 
 	BeforeEach(func() {
-		out = &bytes.Buffer{}
+		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		GinkgoT().Setenv("KUBECONFIG", filepath.Join(GinkgoT().TempDir(), "config"))
 		ci = newFakeCluster()
 		ci.signIn("north1")
@@ -32,6 +32,7 @@ var _ = Describe("ccloud workflow view", func() {
 		err := run("workflow", "view", "api-tests-gone", "-a", "acme", "-r", "north1")
 
 		Expect(err).To(MatchError("acme has no run api-tests-gone in north1; see ccloud workflow list -a acme -r north1"))
+		Expect(errs.String()).To(Equal("Reading api-tests-gone in north1…\n"))
 	})
 
 	It("shows the run's steps in the order they ran, with how long each took and why one failed", func() {

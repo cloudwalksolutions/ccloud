@@ -15,7 +15,7 @@ var _ = Describe("an app repo", func() {
 	var out *bytes.Buffer
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, example, "dev")
+		return cmd.Run(args, out, &bytes.Buffer{}, example, "dev")
 	}
 
 	inRepo := func(appFile string) string {
