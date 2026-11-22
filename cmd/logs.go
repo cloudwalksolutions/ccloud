@@ -6,14 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os/exec"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
-	clientauthentication "k8s.io/client-go/pkg/apis/clientauthentication/v1"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 	"github.com/cloudwalksolutions/ccloud/internal/gateway"
@@ -159,6 +156,7 @@ func followLogs(c *cobra.Command, reader *logReader, query url.Values, printer l
 			return fmt.Errorf("you may no longer read %s's %s logs in %s", app, env, region.Name)
 		case refused.Status == http.StatusUnauthorized && !signedInAgain:
 			reader.signedIn, signedInAgain = nil, true
+			signInAgain(c, region)
 			continue
 		case refused.Status >= 400 && refused.Status < 500:
 			return mayNotRead(err, app, env, region)
@@ -253,37 +251,4 @@ func (r *logReader) signIn() error {
 		r.signedIn = nil
 	}
 	return err
-}
-
-func signInToGateway(c *cobra.Command, home cloud.Cloud, region cloud.Region) (gateway.Gateway, error) {
-	address, err := url.Parse(region.Gateway)
-	if err != nil {
-		return gateway.Gateway{}, fmt.Errorf("%s's gateway %q is not a URL: %w", region.Name, region.Gateway, err)
-	}
-	access, err := accessToken(c, region)
-	if err != nil {
-		return gateway.Gateway{}, err
-	}
-	oidc := exec.CommandContext(c.Context(), "kubectl-oidc_login", oidcArgs(home)...)
-	oidc.Stderr = c.ErrOrStderr()
-	credential, err := oidc.Output()
-	var exchanged clientauthentication.ExecCredential
-	if err != nil || json.Unmarshal(credential, &exchanged) != nil || exchanged.Status == nil {
-		return gateway.Gateway{}, fmt.Errorf("signing in to %s failed", home.Issuer)
-	}
-	return gateway.Gateway{URL: address, AccessToken: access, IDToken: exchanged.Status.Token}, nil
-}
-
-func accessToken(c *cobra.Command, region cloud.Region) (string, error) {
-	token, err := exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+region.Gateway).Output()
-	if err == nil {
-		return strings.TrimSpace(string(token)), nil
-	}
-	login := exec.CommandContext(c.Context(), "cloudflared", "access", "login", "--quiet", region.Gateway)
-	login.Stdout, login.Stderr = c.ErrOrStderr(), c.ErrOrStderr()
-	if err := login.Run(); err != nil {
-		return "", fmt.Errorf("signing in to %s through Cloudflare Access: %w", region.Gateway, err)
-	}
-	token, err = exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+region.Gateway).Output()
-	return strings.TrimSpace(string(token)), err
 }

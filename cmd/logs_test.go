@@ -29,6 +29,8 @@ type fakeGateway struct {
 	network   string
 	summary   string
 	streams   []reply
+	slow      time.Duration
+	asking    func()
 }
 
 type reply struct {
@@ -58,6 +60,10 @@ func (g *fakeGateway) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if app, ok := strings.CutPrefix(r.URL.Path, "/v1/apps/"); ok && g.refuse == 0 {
+		time.Sleep(g.slow)
+		if g.asking != nil {
+			g.asking()
+		}
 		environments := []string{}
 		for _, env := range g.hosts {
 			url := ""

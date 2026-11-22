@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -86,14 +87,31 @@ func regionFor(c *cobra.Command, home cloud.Cloud, name, app, env string) (cloud
 
 func everyRegionsEnvironments(c *cobra.Command, home cloud.Cloud, app string) (map[string][]gateway.Environment, error) {
 	environments := map[string][]gateway.Environment{}
-	for _, region := range home.Regions {
-		signedIn, err := signInToGateway(c, home, region)
-		if err == nil {
-			environments[region.Name], err = signedIn.Environments(c.Context(), app)
-		}
-		if err != nil {
+	done := step(c, fmt.Sprintf("Finding where %s runs in %s", app, and(home.Names())))
+	found := make([][]gateway.Environment, len(home.Regions))
+	failed := make([]error, len(home.Regions))
+	var asking sync.WaitGroup
+	for i, region := range home.Regions {
+		asking.Go(func() {
+			signedIn, err := signInToGateway(c, home, region)
+			if err == nil {
+				found[i], err = signedIn.Environments(c.Context(), app)
+			}
+			failed[i] = err
+		})
+	}
+	asking.Wait()
+	var runs []string
+	for i, region := range home.Regions {
+		if err := failed[i]; err != nil {
+			done(err, "")
 			return nil, fmt.Errorf("asking %s where %s runs: %w; or name the region with --region", region.Name, app, err)
 		}
+		environments[region.Name] = found[i]
+		if len(found[i]) > 0 {
+			runs = append(runs, region.Name)
+		}
 	}
+	done(nil, fmt.Sprintf("%s runs in %s", app, and(runs)))
 	return environments, nil
 }

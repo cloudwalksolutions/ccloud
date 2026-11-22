@@ -3,20 +3,22 @@ package cloud
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 type Cloud struct {
-	Name         string
-	Issuer       string
-	ClientID     string
-	ClientSecret string
-	Scopes       []string
-	APIServer    string
-	Regions      []Region
-	RepoDir      string
-	Releases     string
-	Database     Database
-	Env          Env
+	Name           string
+	Issuer         string
+	ClientID       string
+	ClientSecret   string
+	Scopes         []string
+	APIServer      string
+	Regions        []Region
+	RepoDir        string
+	Releases       string
+	Database       Database
+	Env            Env
+	GatewayTimeout time.Duration
 }
 
 type Database struct {

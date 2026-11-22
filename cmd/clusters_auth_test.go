@@ -18,11 +18,11 @@ var _ = Describe("ccloud clusters auth", func() {
 	var (
 		kubeconfig string
 		bin        string
-		out        *bytes.Buffer
+		out, errs  *bytes.Buffer
 	)
 
 	run := func(args ...string) error {
-		return cmd.Run(args, out, out, example, "dev")
+		return cmd.Run(args, out, errs, example, "dev")
 	}
 
 	tool := func(name, script string) {
@@ -35,7 +35,7 @@ var _ = Describe("ccloud clusters auth", func() {
 		bin = GinkgoT().TempDir()
 		GinkgoT().Setenv("KUBECONFIG", kubeconfig)
 		GinkgoT().Setenv("PATH", bin)
-		out = &bytes.Buffer{}
+		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		tool("cloudflared", "exit 0")
 		tool("kubectl", "exit 0")
 		tool("kubectl-oidc_login", "exit 0")
@@ -46,11 +46,19 @@ var _ = Describe("ccloud clusters auth", func() {
 		interrupted, interrupt := context.WithCancel(ctx)
 		time.AfterFunc(100*time.Millisecond, interrupt)
 
-		err := cmd.RunContext(interrupted, []string{"clusters", "auth", "--region", "north1"}, out, out, example, "dev")
+		err := cmd.RunContext(interrupted, []string{"clusters", "auth", "--region", "north1"}, out, errs, example, "dev")
 
 		Expect(err).To(MatchError(HavePrefix("signing in to north1 failed, so your kubeconfig is unchanged")))
 		Expect(kubeconfig).NotTo(BeAnExistingFile())
 	}, SpecTimeout(3*time.Second))
+
+	It("shows a sign-in prompt as it comes, without waiting for the sign-in to end", func() {
+		tool("kubectl", `echo 'Open http://localhost:8000 to sign in' >&2`)
+
+		Expect(run("clusters", "auth", "--region", "north1")).To(Succeed())
+
+		Expect(errs.String()).To(Equal("Signing in to north1's cluster…\nOpen http://localhost:8000 to sign in\n"))
+	})
 
 	It("names your kubeconfig's directory when it cannot write there", func() {
 		Expect(os.MkdirAll(filepath.Dir(kubeconfig), 0o500)).To(Succeed())
@@ -141,7 +149,7 @@ var _ = Describe("ccloud clusters auth", func() {
 		unbuilt := example
 		unbuilt.ClientID = ""
 
-		err := cmd.Run([]string{"clusters", "auth", "--region", "north1"}, out, out, unbuilt, "dev")
+		err := cmd.Run([]string{"clusters", "auth", "--region", "north1"}, out, errs, unbuilt, "dev")
 
 		Expect(err).To(MatchError("this ccloud was built without an OIDC client for the example cloud; install a release build"))
 		Expect(kubeconfig).NotTo(BeAnExistingFile())
