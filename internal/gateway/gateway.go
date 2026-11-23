@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/cloudwalksolutions/ccloud/internal/app"
 )
 
 type Entry struct {
@@ -40,12 +42,6 @@ func (r Refused) Error() string {
 	return fmt.Sprintf("the gateway answered %d %s: %s", r.Status, http.StatusText(r.Status), r.Reason)
 }
 
-type Environment struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-	URL       string `json:"url,omitempty"`
-}
-
 type Page struct {
 	Entries   []Entry `json:"entries"`
 	Truncated bool    `json:"truncated"`
@@ -65,11 +61,11 @@ func (g Gateway) Containers(ctx context.Context, query url.Values) ([]string, er
 	return answer.Containers, err
 }
 
-func (g Gateway) Environments(ctx context.Context, app string) ([]Environment, error) {
+func (g Gateway) Environments(ctx context.Context, named string) ([]app.Environment, error) {
 	var answer struct {
-		Environments []Environment `json:"environments"`
+		Environments []app.Environment `json:"environments"`
 	}
-	err := g.get(ctx, &url.URL{Path: "/v1/apps/" + url.PathEscape(app)}, "environments", &answer)
+	err := g.get(ctx, &url.URL{Path: "/v1/apps/" + url.PathEscape(named)}, "environments", &answer)
 	return answer.Environments, err
 }
 

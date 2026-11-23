@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cloudwalksolutions/ccloud/internal/app"
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
-	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 	"github.com/cloudwalksolutions/ccloud/internal/repo"
 )
 
@@ -67,51 +67,44 @@ func regionFor(c *cobra.Command, home cloud.Cloud, name, app, env string) (cloud
 	if err != nil {
 		return cloud.Region{}, err
 	}
-	var hosts, has []string
-	for _, region := range home.Regions {
-		for _, environment := range environments[region.Name] {
-			has = append(has, fmt.Sprintf("%s (%s)", environment.Name, region.Name))
-			if environment.Name == env {
-				hosts = append(hosts, region.Name)
-			}
-		}
+	environment, err := environments.Named(env)
+	if err != nil {
+		return cloud.Region{}, err
 	}
-	switch len(hosts) {
-	case 0:
-		return cloud.Region{}, fmt.Errorf("no region hosts %s's %s; it has %s", app, env, strings.Join(has, ", "))
-	case 1:
-		return home.Find(hosts[0])
-	}
-	return cloud.Region{}, fmt.Errorf("%s both host %s's %s; name one with --region", strings.Join(hosts, " and "), app, env)
+	return home.Find(environment.Region)
 }
 
-func everyRegionsEnvironments(c *cobra.Command, home cloud.Cloud, app string) (map[string][]gateway.Environment, error) {
-	environments := map[string][]gateway.Environment{}
-	done := step(c, fmt.Sprintf("Finding where %s runs in %s", app, and(home.Names())))
-	found := make([][]gateway.Environment, len(home.Regions))
+func everyRegionsEnvironments(c *cobra.Command, home cloud.Cloud, named string) (app.Environments, error) {
+	environments := app.Environments{App: named}
+	done := step(c, fmt.Sprintf("Finding where %s runs in %s", named, app.And(home.Names())))
+	found := make([][]app.Environment, len(home.Regions))
 	failed := make([]error, len(home.Regions))
 	var asking sync.WaitGroup
 	for i, region := range home.Regions {
 		asking.Go(func() {
 			signedIn, err := sessionOf(c).gateway(c, home, region)
 			if err == nil {
-				found[i], err = signedIn.Environments(c.Context(), app)
+				found[i], err = signedIn.Environments(c.Context(), named)
 			}
 			failed[i] = err
 		})
 	}
 	asking.Wait()
-	var runs []string
 	for i, region := range home.Regions {
 		if err := failed[i]; err != nil {
 			done(err, "")
-			return nil, fmt.Errorf("asking %s where %s runs: %w; or name the region with --region", region.Name, app, err)
+			return environments, fmt.Errorf("asking %s where %s runs: %w; or name the region with --region", region.Name, named, err)
 		}
-		environments[region.Name] = found[i]
-		if len(found[i]) > 0 {
-			runs = append(runs, region.Name)
+		for _, environment := range found[i] {
+			environment.Region = region.Name
+			environments.All = append(environments.All, environment)
 		}
 	}
-	done(nil, fmt.Sprintf("%s runs in %s", app, and(runs)))
+	if len(environments.All) == 0 {
+		err := fmt.Errorf("no region runs %s, or you may not read any of its environments", named)
+		done(err, "")
+		return environments, err
+	}
+	done(nil, fmt.Sprintf("%s runs in %s", named, app.And(environments.Regions())))
 	return environments, nil
 }

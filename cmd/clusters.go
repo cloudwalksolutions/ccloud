@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
-	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
 
 func clustersCmd(home cloud.Cloud) *cobra.Command {
@@ -57,19 +56,18 @@ func regionCmd(home cloud.Cloud, command *cobra.Command, run func(*cobra.Command
 
 func appRegionsCmd(home cloud.Cloud, command *cobra.Command, run func(*cobra.Command, cloud.Region) error) *cobra.Command {
 	return regionsCmd(home, command, func(c *cobra.Command) ([]cloud.Region, error) {
-		app, err := appNamed(home, "")
-		if err == nil && app == "" {
+		named, err := appNamed(home, "")
+		if err == nil && named == "" {
 			err = whichRegion(c, home)
 		}
-		var environments map[string][]gateway.Environment
-		if err == nil {
-			environments, err = everyRegionsEnvironments(c, home, app)
+		if err != nil {
+			return nil, err
 		}
+		environments, err := everyRegionsEnvironments(c, home, named)
 		var hosting []cloud.Region
-		for _, region := range home.Regions {
-			if len(environments[region.Name]) > 0 {
-				hosting = append(hosting, region)
-			}
+		for _, name := range environments.Regions() {
+			region, _ := home.Find(name)
+			hosting = append(hosting, region)
 		}
 		return hosting, err
 	}, run)

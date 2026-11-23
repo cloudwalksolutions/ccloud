@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cloudwalksolutions/ccloud/internal/app"
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
@@ -46,18 +47,11 @@ func appInfoCmd(home cloud.Cloud) *cobra.Command {
 	return command
 }
 
-func printEnvironmentList(c *cobra.Command, environments map[string][]gateway.Environment) error {
-	type row struct{ env, region, url string }
-	var rows []row
-	for region, envs := range environments {
-		for _, e := range envs {
-			rows = append(rows, row{e.Name, region, e.URL})
-		}
-	}
-	slices.SortFunc(rows, func(a, b row) int { return strings.Compare(a.env, b.env) })
+func printEnvironmentList(c *cobra.Command, environments app.Environments) error {
+	byName := slices.SortedFunc(slices.Values(environments.All), func(a, b app.Environment) int { return strings.Compare(a.Name, b.Name) })
 	table := newTable(c.OutOrStdout(), "ENV", "REGION", "URL")
-	for _, r := range rows {
-		table.row(r.env, r.region, r.url)
+	for _, e := range byName {
+		table.row(e.Name, e.Region, e.URL)
 	}
 	return table.print()
 }

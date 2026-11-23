@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cloudwalksolutions/ccloud/internal/app"
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
@@ -46,7 +47,7 @@ func topCmd(home cloud.Cloud) *cobra.Command {
 	return command
 }
 
-func usagesOf(c *cobra.Command, home cloud.Cloud, name, app, env string) (usages []regionUsage, err error) {
+func usagesOf(c *cobra.Command, home cloud.Cloud, name, named, env string) (usages []regionUsage, err error) {
 	regions, err := namedOr(c, home, name, func(*cobra.Command) ([]cloud.Region, error) { return home.Regions, nil })
 	if err != nil {
 		return nil, err
@@ -55,16 +56,16 @@ func usagesOf(c *cobra.Command, home cloud.Cloud, name, app, env string) (usages
 	for i, region := range regions {
 		names[i] = region.Name
 	}
-	done := step(c, fmt.Sprintf("Asking %s what %s uses", and(names), app))
-	defer func() { done(err, fmt.Sprintf("Read what %s uses", app)) }()
+	done := step(c, fmt.Sprintf("Asking %s what %s uses", app.And(names), named))
+	defer func() { done(err, fmt.Sprintf("Read what %s uses", named)) }()
 	for _, region := range regions {
 		signedIn, err := sessionOf(c).gateway(c, home, region)
 		var found []gateway.Usage
 		if err == nil {
-			found, err = signedIn.Resources(c.Context(), app, env)
+			found, err = signedIn.Resources(c.Context(), named, env)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("asking %s what %s uses: %w", region.Name, app, err)
+			return nil, fmt.Errorf("asking %s what %s uses: %w", region.Name, named, err)
 		}
 		for _, usage := range found {
 			usages = append(usages, regionUsage{region: region, usage: usage})
