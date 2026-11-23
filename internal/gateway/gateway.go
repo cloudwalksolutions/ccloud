@@ -49,7 +49,7 @@ type Page struct {
 
 func (g Gateway) Read(ctx context.Context, query url.Values) (Page, error) {
 	var page Page
-	err := g.get(ctx, &url.URL{Path: "/v1/logs", RawQuery: query.Encode()}, "logs", &page)
+	err := g.get(ctx, "/v1/logs", query, "logs", &page)
 	return page, err
 }
 
@@ -57,7 +57,7 @@ func (g Gateway) Containers(ctx context.Context, query url.Values) ([]string, er
 	var answer struct {
 		Containers []string `json:"containers"`
 	}
-	err := g.get(ctx, &url.URL{Path: "/v1/logs/containers", RawQuery: query.Encode()}, "containers", &answer)
+	err := g.get(ctx, "/v1/logs/containers", query, "containers", &answer)
 	return answer.Containers, err
 }
 
@@ -65,14 +65,20 @@ func (g Gateway) Environments(ctx context.Context, named string) ([]app.Environm
 	var answer struct {
 		Environments []app.Environment `json:"environments"`
 	}
-	err := g.get(ctx, &url.URL{Path: "/v1/apps/" + url.PathEscape(named)}, "environments", &answer)
+	err := g.get(ctx, appPath(named, ""), nil, "environments", &answer)
 	return answer.Environments, err
+}
+
+func appPath(named, rest string) string { return "/v1/apps/" + url.PathEscape(named) + rest }
+
+func endpoint(path string, query url.Values) *url.URL {
+	return &url.URL{Path: path, RawQuery: query.Encode()}
 }
 
 var ErrNotLogs = errors.New("the gateway answered something other than logs")
 
 func (g Gateway) Stream(ctx context.Context, query url.Values, each func(Entry) error) (string, error) {
-	resp, err := g.open(ctx, &url.URL{Path: "/v1/logs/stream", RawQuery: query.Encode()})
+	resp, err := g.open(ctx, endpoint("/v1/logs/stream", query))
 	if err != nil {
 		return "", err
 	}
@@ -104,11 +110,11 @@ func (g Gateway) timeout() time.Duration {
 	return cmp.Or(g.Timeout, 15*time.Second)
 }
 
-func (g Gateway) get(ctx context.Context, path *url.URL, what string, into any) error {
+func (g Gateway) get(ctx context.Context, path string, query url.Values, what string, into any) error {
 	timeout := g.timeout()
 	answering, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	resp, err := g.open(answering, path)
+	resp, err := g.open(answering, endpoint(path, query))
 	if ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
 		return fmt.Errorf("the gateway did not answer within %s", timeout)
 	}

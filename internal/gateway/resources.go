@@ -15,6 +15,6 @@ func (g Gateway) Resources(ctx context.Context, named, env string) ([]app.Usage,
 	if env != "" {
 		query.Set("env", env)
 	}
-	err := g.get(ctx, &url.URL{Path: "/v1/apps/" + url.PathEscape(named) + "/resources", RawQuery: query.Encode()}, "resources", &answer)
+	err := g.get(ctx, appPath(named, "/resources"), query, "resources", &answer)
 	return answer.Environments, err
 }

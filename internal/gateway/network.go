@@ -36,6 +36,6 @@ type Traffic struct {
 func (g Gateway) Network(ctx context.Context, app, env string, since time.Duration) (Traffic, error) {
 	var answer Traffic
 	query := url.Values{"env": {env}, "since": {since.String()}}
-	err := g.get(ctx, &url.URL{Path: "/v1/apps/" + url.PathEscape(app) + "/network", RawQuery: query.Encode()}, "network traffic", &answer)
+	err := g.get(ctx, appPath(app, "/network"), query, "network traffic", &answer)
 	return answer, err
 }
