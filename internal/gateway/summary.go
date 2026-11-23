@@ -9,14 +9,12 @@ import (
 type Check struct {
 	Flow   string `json:"flow"`
 	Status string `json:"status"`
-	Run    string `json:"run"`
 }
 
 type Pull struct {
 	Number         int     `json:"number"`
 	Title          string  `json:"title"`
 	Author         string  `json:"author"`
-	Branch         string  `json:"branch"`
 	OpenedHoursAgo float64 `json:"openedHoursAgo"`
 	Draft          bool    `json:"draft"`
 	Reviewed       bool    `json:"reviewed"`
@@ -54,6 +52,6 @@ func (g Gateway) Summary(ctx context.Context, app string, weeks int) (Summary, e
 	var answer Summary
 	query := url.Values{"weeks": {strconv.Itoa(weeks)}}
 	g.Timeout = 4 * g.timeout()
-	err := g.get(ctx, &url.URL{Path: "/v1/apps/" + url.PathEscape(app) + "/summary", RawQuery: query.Encode()}, "a summary", &answer)
+	err := g.get(ctx, appPath(app, "/summary"), query, "a summary", &answer)
 	return answer, err
 }

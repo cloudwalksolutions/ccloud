@@ -115,12 +115,17 @@ func (r Runs) path(name ...string) string {
 	return strings.Join(append([]string{"/apis/argoproj.io/v1alpha1/namespaces", r.namespace, "workflows"}, name...), "/")
 }
 
+func decode(ctx context.Context, request *rest.Request, into any) error {
+	raw, err := request.DoRaw(ctx)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(raw, into)
+}
+
 func (r Runs) Get(ctx context.Context, name string) (Run, error) {
 	var run Run
-	raw, err := r.core.RESTClient().Get().AbsPath(r.path(name)).DoRaw(ctx)
-	if err == nil {
-		err = json.Unmarshal(raw, &run)
-	}
+	err := decode(ctx, r.core.RESTClient().Get().AbsPath(r.path(name)), &run)
 	return run, err
 }
 
@@ -128,10 +133,7 @@ func (r Runs) List(ctx context.Context, selector string) ([]Run, error) {
 	var list struct {
 		Items []Run `json:"items"`
 	}
-	raw, err := r.core.RESTClient().Get().AbsPath(r.path()).Param("labelSelector", selector).DoRaw(ctx)
-	if err == nil {
-		err = json.Unmarshal(raw, &list)
-	}
+	err := decode(ctx, r.core.RESTClient().Get().AbsPath(r.path()).Param("labelSelector", selector), &list)
 	slices.SortFunc(list.Items, func(a, b Run) int {
 		return b.Metadata.CreationTimestamp.Compare(a.Metadata.CreationTimestamp)
 	})
@@ -171,9 +173,6 @@ func (r Runs) create(ctx context.Context, metadata, spec map[string]any) (string
 		"spec":       spec,
 	}}
 	var created Run
-	raw, err := r.core.RESTClient().Post().AbsPath(r.path()).Body(workflow).DoRaw(ctx)
-	if err == nil {
-		err = json.Unmarshal(raw, &created)
-	}
+	err := decode(ctx, r.core.RESTClient().Post().AbsPath(r.path()).Body(workflow), &created)
 	return created.Name(), err
 }
