@@ -75,7 +75,7 @@ func appRegionsCmd(home cloud.Cloud, command *cobra.Command, run func(*cobra.Com
 
 func regionsCmd(home cloud.Cloud, command *cobra.Command, unnamed func(*cobra.Command) ([]cloud.Region, error), run func(*cobra.Command, cloud.Region) error) *cobra.Command {
 	var name string
-	command.Flags().StringVarP(&name, "region", "r", "", "the "+home.Name+" region: "+strings.Join(home.Names(), ", "))
+	command.Flags().StringVarP(&name, "region", "r", "", regionHelp(home))
 	if command.Args == nil {
 		command.Args = cobra.NoArgs
 	}

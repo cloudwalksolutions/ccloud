@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -40,8 +39,8 @@ func topCmd(home cloud.Cloud) *cobra.Command {
 		},
 	}
 	command.Flags().BoolVarP(&verbose, "verbose", "v", false, "each workload's containers too, with the node each runs on")
-	command.Flags().StringVarP(&app, "app", "a", "", "the app, as it is named in its namespaces")
-	command.Flags().StringVarP(&region, "region", "r", "", "the "+home.Name+" region: "+strings.Join(home.Names(), ", ")+"; every region hosting the app when left out")
+	appFlag(command, &app)
+	command.Flags().StringVarP(&region, "region", "r", "", regionHelp(home)+"; every region hosting the app when left out")
 	command.Flags().StringVarP(&env, "env", "e", "", "one environment; every environment when left out")
 	return command
 }

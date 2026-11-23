@@ -28,10 +28,10 @@ func step(c *cobra.Command, doing string) func(err error, done string) {
 		<-spinning.stopped
 		c.SetErr(out)
 		if err != nil {
-			fmt.Fprintf(out, "\r\x1b[K%s %s\n", color.paint("31", "X"), doing)
+			fmt.Fprintf(out, "\r\x1b[K%s %s\n", color.red("X"), doing)
 			return
 		}
-		fmt.Fprintf(out, "\r\x1b[K%s %s\n", color.paint("32", "✓"), done)
+		fmt.Fprintf(out, "\r\x1b[K%s %s\n", color.green("✓"), done)
 	}
 }
 

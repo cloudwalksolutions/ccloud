@@ -21,7 +21,7 @@ func newTable(out io.Writer, header ...string) *table {
 	if len(header) > 0 {
 		bold := make([]string, len(header))
 		for i, cell := range header {
-			bold[i] = paletteFor(out).paint("01", cell)
+			bold[i] = paletteFor(out).bold(cell)
 		}
 		t.rows = append(t.rows, bold)
 	}

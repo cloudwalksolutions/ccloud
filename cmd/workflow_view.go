@@ -13,14 +13,14 @@ import (
 )
 
 func workflowView(c *cobra.Command, region cloud.Region, app string, _ workflows.Runs, run workflows.Run) error {
-	render(c.OutOrStdout(), run, time.Now())
+	printRun(c.OutOrStdout(), run, time.Now())
 	if failed(run.Status.Phase) {
 		fmt.Fprintf(c.OutOrStdout(), "\nTo see what failed, try: ccloud workflow logs %s -a %s -r %s --failed\n", run.Name(), app, region.Name)
 	}
 	return nil
 }
 
-func render(out io.Writer, run workflows.Run, now time.Time) {
+func printRun(out io.Writer, run workflows.Run, now time.Time) {
 	color := paletteFor(out)
 	title := []string{color.status(run.Status.Phase) + " " + run.Flow()}
 	if run.PR() != "" {
@@ -37,16 +37,17 @@ func render(out io.Writer, run workflows.Run, now time.Time) {
 		verb = "has run for"
 	}
 	fmt.Fprintf(out, "%s started %s and %s %s\n", run.Name(), age(now.Sub(run.Status.StartedAt)), verb, run.Elapsed(now).Round(time.Second))
-	for i, step := range run.Steps() {
-		if i == 0 {
-			fmt.Fprintln(out)
-		}
+	steps := run.Steps()
+	if len(steps) > 0 {
+		fmt.Fprintln(out)
+	}
+	for _, step := range steps {
 		line := color.status(step.Phase) + " " + step.DisplayName
 		if step.Took() > 0 {
 			line += " in " + step.Took().Round(time.Second).String()
 		}
 		fmt.Fprintln(out, line)
-		if step.Phase == "Failed" || step.Phase == "Error" {
+		if failed(step.Phase) {
 			fmt.Fprintln(out, "  "+step.Message)
 		}
 	}

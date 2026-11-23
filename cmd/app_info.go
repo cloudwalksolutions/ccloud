@@ -40,7 +40,7 @@ func appInfoCmd(home cloud.Cloud) *cobra.Command {
 			return printEnvironmentList(c, environments)
 		},
 	}
-	command.Flags().StringVarP(&app, "app", "a", "", "the app, as it is named in its namespaces")
+	appFlag(command, &app)
 	command.Flags().StringVarP(&region, "region", "r", "", "with --summary, the region running the app's CI; found for you when left out")
 	command.Flags().BoolVar(&summary, "summary", false, "open pull requests with their checks, then how the last weeks went")
 	command.Flags().IntVar(&weeks, "weeks", 4, "with --summary, how many weeks back to look")
@@ -112,12 +112,3 @@ func printWeeks(out io.Writer, s gateway.Summary, weeks int) error {
 	}
 	return table.print()
 }
-
-func quantity(n int, thing string) string {
-	if n == 1 {
-		return "1 " + thing
-	}
-	return fmt.Sprintf("%d %ss", n, thing)
-}
-
-func hours(h float64) string { return strconv.FormatFloat(h, 'f', -1, 64) + "h" }

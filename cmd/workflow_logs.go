@@ -43,10 +43,6 @@ func stepLog(c *cobra.Command, kept *logReader, app string, runs workflows.Runs,
 	return text, err
 }
 
-func failed(phase string) bool {
-	return phase == "Failed" || phase == "Error"
-}
-
 func keptLog(kept *logReader, app string, run workflows.Run, step workflows.Step) (string, error) {
 	page, err := kept.read(url.Values{
 		"namespace": {"ci-" + app},

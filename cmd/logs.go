@@ -26,7 +26,7 @@ func logsCmd(home cloud.Cloud) *cobra.Command {
 		return readLogs(c, home, region, app)
 	})
 	flags := command.Flags()
-	flags.StringP("env", "e", "", "the environment: prod, stage, ci, or a feature environment's name")
+	flags.StringP("env", "e", "", envHelp)
 	flags.Duration("since", time.Hour, "how far back to read")
 	flags.String("since-time", "", "read from this time, such as 2026-10-26T07:00:00Z, rather than --since ago")
 	flags.String("until", "", "read up to this time, or a while ago such as 10m; now when left out")
@@ -65,7 +65,7 @@ func logContainersCmd(home cloud.Cloud) *cobra.Command {
 		}
 		return err
 	})
-	command.Flags().StringP("env", "e", "", "the environment: prod, stage, ci, or a feature environment's name")
+	command.Flags().StringP("env", "e", "", envHelp)
 	return command
 }
 
@@ -253,9 +253,9 @@ func (r *logReader) signIn() error {
 		return nil
 	}
 	g, err := sessionOf(r.c).gateway(r.c, r.home, r.region)
-	r.signedIn = &g
 	if err != nil {
-		r.signedIn = nil
+		return err
 	}
-	return err
+	r.signedIn = &g
+	return nil
 }

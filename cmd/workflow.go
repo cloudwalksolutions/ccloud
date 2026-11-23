@@ -101,3 +101,7 @@ func oneRun(c *cobra.Command, args []string) error {
 	}
 	return nil
 }
+
+func failed(phase string) bool {
+	return phase == "Failed" || phase == "Error"
+}

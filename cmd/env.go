@@ -106,10 +106,10 @@ func report(color palette, changes dotenv.Changes, file, source string) string {
 	}
 	lines := file + ", from " + source + ":\n"
 	for _, name := range changes.Added {
-		lines += "  " + color.paint("32", "added  ") + "  " + name + "\n"
+		lines += "  " + color.green("added  ") + "  " + name + "\n"
 	}
 	for _, name := range changes.Changed {
-		lines += "  " + color.paint("33", "changed") + "  " + name + "\n"
+		lines += "  " + color.yellow("changed") + "  " + name + "\n"
 	}
 	if changes.Unchanged > 0 {
 		lines += fmt.Sprintf("%d unchanged.\n", changes.Unchanged)
