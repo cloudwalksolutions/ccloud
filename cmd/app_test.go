@@ -116,7 +116,7 @@ var _ = Describe("ccloud app", func() {
 			"checks":[{"flow":"api-tests","status":"Succeeded","run":"api-tests-x1"},{"flow":"web-tests","status":"Running","run":"web-tests-x2"}]}],
 			"flow":{"merged":2,"openToMergeHours":12,"firstReviewHours":1.5},
 			"delivery":{"deploys":1,"mergeToProdHours":1},
-			"ci":[{"flow":"api-tests","runs":3,"medianSeconds":700,"firstTryPassRate":0.5,"reruns":1}]}`
+			"ci":[{"flow":"api-tests","runs":3,"medianSeconds":699.5519645,"firstTryPassRate":0.5,"reruns":1}]}`
 
 		Expect(run("app", "-a", "acme", "--summary", "--weeks", "1")).To(Succeed())
 
