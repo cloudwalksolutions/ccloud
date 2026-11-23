@@ -85,3 +85,10 @@ func printDrops(out io.Writer, drops []gateway.Drop, window string) error {
 	}
 	return table.print()
 }
+
+func (p palette) flags(flags []string) string {
+	if len(flags) == 0 {
+		return ""
+	}
+	return p.paint("31", "! "+strings.Join(flags, ", "))
+}

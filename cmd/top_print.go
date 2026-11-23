@@ -2,136 +2,98 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"math"
-	"strconv"
 	"strings"
 
 	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
 
-func printContainers(out io.Writer, usages []regionUsage) error {
-	color := paletteFor(out)
-	table := newTable(out, "CONTAINER", "CPU USED/REQ/LIMIT", "MEMORY USED/LIMIT", "RESTARTS", "NODE", "FLAGS")
-	var nodes []gateway.Node
-	for _, u := range usages {
-		for _, c := range u.usage.Containers {
-			table.row(c.Pod+"/"+c.Container,
-				cores(&c.CPU.Used)+"/"+cores(c.CPU.Request)+"/"+cores(c.CPU.Limit),
-				memory(&c.Memory.Used)+"/"+memory(c.Memory.Limit), fmt.Sprintf("%.0f", c.Restarts), c.Node, color.flags(containerFlags(c)))
-		}
-		nodes = append(nodes, u.usage.Nodes...)
-	}
-	err := table.print()
-	for _, n := range nodes {
-		if pressure := nodeFlags(n); len(pressure) > 0 {
-			fmt.Fprintf(out, "\n%s is under pressure (the node, not your limits): %s\n", n.Name, strings.Join(pressure, ", "))
-		}
-	}
-	return err
+type severity int
+
+const (
+	hint severity = iota
+	warn
+	bad
+)
+
+type issue struct {
+	severity severity
+	text     string
 }
 
-func printEnvironments(out io.Writer, usages []regionUsage) error {
-	color := paletteFor(out)
-	table := newTable(out, "ENV", "REGION", "PODS", "CPU USED/REQ", "MEMORY USED/LIMIT", "FLAGS")
-	for _, u := range usages {
-		var cpu, requested, used, limit float64
-		pods := map[string]bool{}
-		containers := 0
-		for _, c := range u.usage.Containers {
-			pods[c.Pod] = true
-			cpu += c.CPU.Used
-			used += c.Memory.Used
-			if c.CPU.Request != nil {
-				requested += *c.CPU.Request
-			}
-			if c.Memory.Limit != nil {
-				limit += *c.Memory.Limit
-			}
-			if len(containerFlags(c)) > 0 {
-				containers++
-			}
-		}
-		pressured := 0
-		for _, n := range u.usage.Nodes {
-			if len(nodeFlags(n)) > 0 {
-				pressured++
-			}
-		}
-		table.row(u.usage.Name, u.region.Name, strconv.Itoa(len(pods)), fmt.Sprintf("%.2f/%.2f", cpu, requested),
-			memory(&used)+"/"+memory(&limit), color.flags(counted(containers, "container", counted(pressured, "node", nil))))
+func severityOf(value, warnAt, badAt float64) severity {
+	switch {
+	case value >= badAt:
+		return bad
+	case value >= warnAt:
+		return warn
 	}
-	err := table.print()
-	fmt.Fprintln(out, "ccloud top -e <env> shows each container and why it is flagged.")
-	return err
+	return hint
 }
 
-func counted(n int, thing string, rest []string) []string {
-	switch n {
-	case 0:
-		return rest
-	case 1:
-		return append([]string{"1 " + thing}, rest...)
-	}
-	return append([]string{fmt.Sprintf("%d %ss", n, thing)}, rest...)
-}
-
-func containerFlags(c gateway.Container) []string {
-	var flags []string
-	if c.CPU.Limit == nil {
-		flags = append(flags, "no CPU limit")
-	}
-	if c.Memory.Limit == nil {
-		flags = append(flags, "no memory limit")
-	}
-	if c.Throttled != nil && *c.Throttled >= 0.25 {
-		flags = append(flags, fmt.Sprintf("throttled %s", percent(*c.Throttled)))
-	}
-	if c.Memory.Limit != nil && c.Memory.Used / *c.Memory.Limit >= 0.9 {
-		flags = append(flags, fmt.Sprintf("memory %s of limit", percent(c.Memory.Used / *c.Memory.Limit)))
+func containerIssues(c gateway.Container) []issue {
+	var issues []issue
+	if c.Waiting != "" {
+		issues = append(issues, issue{bad, "not running: " + c.Waiting})
 	}
 	if c.OOMKills > 0 {
-		flags = append(flags, fmt.Sprintf("OOMKilled %.0f×", c.OOMKills))
+		issues = append(issues, issue{bad, fmt.Sprintf("OOMKilled %.0f×", c.OOMKills)})
 	}
-	if c.Restarts >= 3 {
-		flags = append(flags, fmt.Sprintf("restarted %.0f×", c.Restarts))
+	if c.Memory.Limit != nil {
+		if used := c.Memory.Used / *c.Memory.Limit; used >= 0.75 {
+			issues = append(issues, issue{severityOf(used, 0.75, 0.9), fmt.Sprintf("memory %s of limit", percent(used))})
+		}
 	}
-	return flags
+	if c.Throttled != nil && *c.Throttled >= 0.05 {
+		issues = append(issues, issue{severityOf(*c.Throttled, 0.05, 0.25), "throttled " + percent(*c.Throttled)})
+	}
+	if c.Restarts >= 1 {
+		issues = append(issues, issue{severityOf(c.Restarts, 1, 3), fmt.Sprintf("restarted %.0f×", c.Restarts)})
+	}
+	if c.CPU.Limit == nil {
+		issues = append(issues, issue{hint, "no CPU limit"})
+	}
+	if c.Memory.Limit == nil {
+		issues = append(issues, issue{hint, "no memory limit"})
+	}
+	return issues
 }
 
-func nodeFlags(n gateway.Node) []string {
-	var flags []string
+func nodeIssues(n gateway.Node) []issue {
+	var issues []issue
 	if n.CPUWait > 0.9 {
-		flags = append(flags, "CPU wait "+percent(n.CPUWait))
+		issues = append(issues, issue{warn, "CPU wait " + percent(n.CPUWait)})
 	}
 	if n.MemoryStall > 0.1 {
-		flags = append(flags, "memory stall "+percent(n.MemoryStall))
+		issues = append(issues, issue{warn, "memory stall " + percent(n.MemoryStall)})
 	}
-	return append(flags, n.Conditions...)
+	for _, condition := range n.Conditions {
+		issues = append(issues, issue{bad, condition})
+	}
+	return issues
 }
 
-func (p palette) flags(flags []string) string {
-	if len(flags) == 0 {
-		return ""
+func (p palette) severe(s severity, text string) string {
+	return p.paint(map[severity]string{hint: "2", warn: "33", bad: "31"}[s], text)
+}
+
+func (p palette) issues(issues []issue) string {
+	seen := map[string]bool{}
+	var painted []string
+	for _, i := range issues {
+		if !seen[i.text] {
+			seen[i.text] = true
+			painted = append(painted, p.severe(i.severity, i.text))
+		}
 	}
-	return p.paint("31", "! "+strings.Join(flags, ", "))
+	return strings.Join(painted, ", ")
 }
 
 func percent(fraction float64) string { return fmt.Sprintf("%.0f%%", math.Round(fraction*100)) }
 
-func cores(value *float64) string {
-	if value == nil {
-		return "none"
+func memory(bytes float64) string {
+	if bytes >= 1<<30 {
+		return fmt.Sprintf("%.1fGi", bytes/(1<<30))
 	}
-	return fmt.Sprintf("%.2f", *value)
-}
-
-func memory(value *float64) string {
-	switch {
-	case value == nil:
-		return "none"
-	case *value >= 1<<30:
-		return fmt.Sprintf("%.1fGi", *value/(1<<30))
-	}
-	return fmt.Sprintf("%.0fMi", *value/(1<<20))
+	return fmt.Sprintf("%.0fMi", bytes/(1<<20))
 }

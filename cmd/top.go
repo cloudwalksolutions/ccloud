@@ -17,6 +17,7 @@ type regionUsage struct {
 
 func topCmd(home cloud.Cloud) *cobra.Command {
 	var app, region, env string
+	var verbose bool
 	command := &cobra.Command{
 		Use:     "top [-e <env>] [--app <app>]",
 		Short:   "How much CPU and memory an app uses, everywhere or in one environment, and what is under pressure",
@@ -35,15 +36,13 @@ func topCmd(home cloud.Cloud) *cobra.Command {
 				_, err := fmt.Fprintf(c.OutOrStdout(), "%s has no environment you may read.\n", named)
 				return err
 			}
-			if env == "" {
-				return printEnvironments(c.OutOrStdout(), usages)
-			}
-			return printContainers(c.OutOrStdout(), usages)
+			return printTree(c.OutOrStdout(), named, usages, verbose)
 		},
 	}
+	command.Flags().BoolVarP(&verbose, "verbose", "v", false, "each workload's containers too, with the node each runs on")
 	command.Flags().StringVarP(&app, "app", "a", "", "the app, as it is named in its namespaces")
 	command.Flags().StringVarP(&region, "region", "r", "", "the "+home.Name+" region: "+strings.Join(home.Names(), ", ")+"; every region hosting the app when left out")
-	command.Flags().StringVarP(&env, "env", "e", "", "one environment, container by container; every environment when left out")
+	command.Flags().StringVarP(&env, "env", "e", "", "one environment; every environment when left out")
 	return command
 }
 
