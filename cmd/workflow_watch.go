@@ -36,7 +36,7 @@ func follow(c *cobra.Command, region cloud.Region, app string, runs workflows.Ru
 	for err == nil && run.Status.FinishedAt.IsZero() {
 		if redraw {
 			fmt.Fprint(out, clearScreen)
-			render(out, run, time.Now())
+			printRun(out, run, time.Now())
 			fmt.Fprintf(out, "\nLooking again every %s; Ctrl-C stops watching, not the run.\n", interval)
 		} else {
 			printChanges(c.ErrOrStderr(), run, phases)
@@ -51,13 +51,12 @@ func follow(c *cobra.Command, region cloud.Region, app string, runs workflows.Ru
 	if err != nil {
 		return err
 	}
-	if !redraw {
-		printChanges(c.ErrOrStderr(), run, phases)
-	}
 	if redraw {
 		fmt.Fprint(out, clearScreen)
+	} else {
+		printChanges(c.ErrOrStderr(), run, phases)
 	}
-	render(out, run, time.Now())
+	printRun(out, run, time.Now())
 	fmt.Fprintf(out, "\n%s %s completed: %s\n", paletteFor(out).status(run.Status.Phase), run.Name(), run.Status.Phase)
 	if strict && run.Status.Phase != "Succeeded" {
 		return fmt.Errorf("%s did not succeed: %s", run.Name(), run.Status.Phase)

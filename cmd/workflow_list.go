@@ -47,33 +47,3 @@ func workflowList(c *cobra.Command, region cloud.Region, app string, ci workflow
 	}
 	return table.print()
 }
-
-func symbol(phase string) string {
-	switch phase {
-	case "Succeeded":
-		return "✓"
-	case "Failed", "Error":
-		return "X"
-	case "Skipped", "Omitted":
-		return "-"
-	default:
-		return "*"
-	}
-}
-
-func short(sha string) string {
-	return sha[:min(len(sha), 7)]
-}
-
-func age(d time.Duration) string {
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
-}

@@ -71,7 +71,7 @@ var _ = Describe("ccloud top", func() {
 
 		Expect(run("top", "-a", "acme")).To(Succeed())
 
-		Expect(out.String()).To(ContainSubstring("\x1b[31mrestarted 3×\x1b[0m, \x1b[2mno memory limit\x1b[0m"))
+		Expect(out.String()).To(ContainSubstring("\x1b[31mrestarted 3×\x1b[0m, \x1b[90mno memory limit\x1b[0m"))
 		Expect(out.String()).To(ContainSubstring("\x1b[33mmemory stall 20%\x1b[0m"))
 		lines := strings.Split(strings.TrimSpace(plain(out.String())), "\n")
 		Expect(lines).To(HaveExactElements(

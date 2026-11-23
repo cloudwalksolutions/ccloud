@@ -78,9 +78,12 @@ func (s *session) idToken(c *cobra.Command, home cloud.Cloud) (string, error) {
 }
 
 func (s *session) accessToken(c *cobra.Command, region cloud.Region) (string, error) {
-	token, err := exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+region.Gateway).Output()
-	if err == nil {
-		return strings.TrimSpace(string(token)), nil
+	token := func() (string, error) {
+		out, err := exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+region.Gateway).Output()
+		return strings.TrimSpace(string(out)), err
+	}
+	if signedIn, err := token(); err == nil {
+		return signedIn, nil
 	}
 	s.prompts.Lock()
 	defer s.prompts.Unlock()
@@ -89,6 +92,5 @@ func (s *session) accessToken(c *cobra.Command, region cloud.Region) (string, er
 	if err := login.Run(); err != nil {
 		return "", fmt.Errorf("signing in to %s through Cloudflare Access: %w", region.Gateway, err)
 	}
-	token, err = exec.CommandContext(c.Context(), "cloudflared", "access", "token", "--app="+region.Gateway).Output()
-	return strings.TrimSpace(string(token)), err
+	return token()
 }

@@ -17,10 +17,20 @@ type envOf func(*cobra.Command) (string, error)
 
 func ciEnv(*cobra.Command) (string, error) { return "ci", nil }
 
+const envHelp = "the environment: prod, stage, ci, or a feature environment's name"
+
+func appFlag(command *cobra.Command, app *string) {
+	command.Flags().StringVarP(app, "app", "a", "", "the app, as it is named in its namespaces")
+}
+
+func regionHelp(home cloud.Cloud) string {
+	return "the " + home.Name + " region: " + strings.Join(home.Names(), ", ")
+}
+
 func appCmd(home cloud.Cloud, command *cobra.Command, env envOf, run func(*cobra.Command, cloud.Region, string) error) *cobra.Command {
 	var app, region string
-	command.Flags().StringVarP(&app, "app", "a", "", "the app, as it is named in its namespaces")
-	command.Flags().StringVarP(&region, "region", "r", "", "the "+home.Name+" region: "+strings.Join(home.Names(), ", ")+"; found for you when left out")
+	appFlag(command, &app)
+	command.Flags().StringVarP(&region, "region", "r", "", regionHelp(home)+"; found for you when left out")
 	if command.Args == nil {
 		command.Args = cobra.NoArgs
 	}

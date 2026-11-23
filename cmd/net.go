@@ -34,7 +34,7 @@ func netCmd(home cloud.Cloud) *cobra.Command {
 		}
 		return printTraffic(c.OutOrStdout(), seen, since)
 	})
-	command.Flags().StringP("env", "e", "", "the environment: prod, stage, ci, or a feature environment's name")
+	command.Flags().StringP("env", "e", "", envHelp)
 	command.Flags().Duration("since", time.Hour, "how far back to look")
 	return command
 }
@@ -90,5 +90,5 @@ func (p palette) flags(flags []string) string {
 	if len(flags) == 0 {
 		return ""
 	}
-	return p.paint("31", "! "+strings.Join(flags, ", "))
+	return p.red("! " + strings.Join(flags, ", "))
 }

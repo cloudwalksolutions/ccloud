@@ -118,12 +118,8 @@ func (t dbConnection) print(out io.Writer, closer string) error {
 	return table.print()
 }
 
-func truncated(secret string) string {
-	return secret[:min(4, len(secret))] + "…"
-}
-
 func cautionAboutProd(out io.Writer, app string) {
-	fmt.Fprint(out, paletteFor(out).paint("31", fmt.Sprintf("CAUTION: this is %s's production database, and its only primary.\n", app)+
+	fmt.Fprint(out, paletteFor(out).red(fmt.Sprintf("CAUTION: this is %s's production database, and its only primary.\n", app)+
 		"  - Every query adds load to the live app: keep them small and indexed.\n"+
 		"  - A write changes real data at once, and nothing here undoes it.\n"+
 		"  - Reads show customers' personal data: select only what you need.\n"))

@@ -26,7 +26,7 @@ func (p logPrinter) print(entry gateway.Entry) {
 		_ = json.NewEncoder(p.out).Encode(entry)
 	default:
 		line := strings.ReplaceAll(strings.TrimRight(p.readable(entry.Line), "\n"), "\n", "\n    ")
-		fmt.Fprintf(p.out, "%s %s %s %s\n", p.color.paint("90", stamp(entry.Time)), p.color.paint(hue(entry.Container), entry.Container), entry.Pod, line)
+		fmt.Fprintf(p.out, "%s %s %s %s\n", p.color.dim(stamp(entry.Time)), p.color.paint(hue(entry.Container), entry.Container), entry.Pod, line)
 	}
 }
 
@@ -77,11 +77,11 @@ func (p logPrinter) readable(line string) string {
 func (p logPrinter) badge(level string) string {
 	switch level {
 	case "ERROR", "FATAL", "PANIC":
-		return p.color.paint("31", level)
+		return p.color.red(level)
 	case "WARN", "WARNING":
-		return p.color.paint("33", level)
+		return p.color.yellow(level)
 	default:
-		return p.color.paint("36", level)
+		return p.color.cyan(level)
 	}
 }
 
