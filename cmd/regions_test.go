@@ -3,7 +3,6 @@ package cmd_test
 import (
 	"bytes"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,29 +29,12 @@ var _ = Describe("finding the region", func() {
 		return cmd.Run(args, out, out, home, "dev")
 	}
 
-	tool := func(bin, name, script string) {
-		Expect(os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+script+"\n"), 0o755)).To(Succeed())
-	}
-
-	serve := func(g *fakeGateway) string {
-		server := httptest.NewServer(http.HandlerFunc(g.serve))
-		DeferCleanup(server.Close)
-		return server.URL
-	}
-
 	BeforeEach(func() {
 		out = &bytes.Buffer{}
 		north = &fakeGateway{hosts: []string{"ci"}}
 		south = &fakeGateway{hosts: []string{"prod", "stage"}}
-		home = example
-		home.Regions = append([]cloud.Region{}, example.Regions...)
-		home.Regions[0].Gateway = serve(north)
-		home.Regions[1].Gateway = serve(south)
-
-		bin := GinkgoT().TempDir()
-		GinkgoT().Setenv("PATH", bin)
-		tool(bin, "cloudflared", `[ "$1 $2" = "access token" ] && echo access-jwt`)
-		tool(bin, "kubectl-oidc_login", `echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
+		home = servedBy(north, south)
+		signInTools()
 	})
 
 	It("names the environments the app has when no region hosts the one asked for", func() {

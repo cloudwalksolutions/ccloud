@@ -25,10 +25,6 @@ var _ = Describe("ccloud clusters auth", func() {
 		return cmd.Run(args, out, errs, example, "dev")
 	}
 
-	tool := func(name, script string) {
-		Expect(os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+script+"\n"), 0o755)).To(Succeed())
-	}
-
 	BeforeEach(func() {
 		home := GinkgoT().TempDir()
 		kubeconfig = filepath.Join(home, ".kube", "config")
@@ -36,13 +32,13 @@ var _ = Describe("ccloud clusters auth", func() {
 		GinkgoT().Setenv("KUBECONFIG", kubeconfig)
 		GinkgoT().Setenv("PATH", bin)
 		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
-		tool("cloudflared", "exit 0")
-		tool("kubectl", "exit 0")
-		tool("kubectl-oidc_login", "exit 0")
+		tool(bin, "cloudflared", "exit 0")
+		tool(bin, "kubectl", "exit 0")
+		tool(bin, "kubectl-oidc_login", "exit 0")
 	})
 
 	It("stops waiting for your sign-in when you press Ctrl-C, leaving your kubeconfig alone", func(ctx SpecContext) {
-		tool("kubectl", `exec /bin/sleep 5`)
+		tool(bin, "kubectl", `exec /bin/sleep 5`)
 		interrupted, interrupt := context.WithCancel(ctx)
 		time.AfterFunc(100*time.Millisecond, interrupt)
 
@@ -53,7 +49,7 @@ var _ = Describe("ccloud clusters auth", func() {
 	}, SpecTimeout(3*time.Second))
 
 	It("shows a sign-in prompt as it comes, without waiting for the sign-in to end", func() {
-		tool("kubectl", `echo 'Open http://localhost:8000 to sign in' >&2`)
+		tool(bin, "kubectl", `echo 'Open http://localhost:8000 to sign in' >&2`)
 
 		Expect(run("clusters", "auth", "--region", "north1")).To(Succeed())
 
@@ -73,7 +69,7 @@ var _ = Describe("ccloud clusters auth", func() {
 		existing := []byte("contexts: [this is not a kubeconfig")
 		Expect(os.MkdirAll(filepath.Dir(kubeconfig), 0o700)).To(Succeed())
 		Expect(os.WriteFile(kubeconfig, existing, 0o600)).To(Succeed())
-		tool("kubectl", `echo "Username  dev@example.test"`)
+		tool(bin, "kubectl", `echo "Username  dev@example.test"`)
 
 		err := run("clusters", "auth", "--region", "north1")
 
@@ -85,7 +81,7 @@ var _ = Describe("ccloud clusters auth", func() {
 		existing := []byte("apiVersion: v1\nkind: Config\ncurrent-context: work\ncontexts:\n- name: work\n  context: {cluster: work, user: work}\nclusters:\n- name: work\n  cluster: {server: https://work.example}\nusers:\n- name: work\n  user: {token: t}\n")
 		Expect(os.MkdirAll(filepath.Dir(kubeconfig), 0o700)).To(Succeed())
 		Expect(os.WriteFile(kubeconfig, existing, 0o600)).To(Succeed())
-		tool("kubectl", `echo "error: You must be logged in to the server (Unauthorized)" >&2; exit 1`)
+		tool(bin, "kubectl", `echo "error: You must be logged in to the server (Unauthorized)" >&2; exit 1`)
 
 		err := run("clusters", "auth", "--region", "north1")
 
@@ -96,7 +92,7 @@ var _ = Describe("ccloud clusters auth", func() {
 	It("adds the region beside your other clusters and switches you to it, however often it runs", func() {
 		Expect(os.MkdirAll(filepath.Dir(kubeconfig), 0o700)).To(Succeed())
 		Expect(os.WriteFile(kubeconfig, []byte("apiVersion: v1\nkind: Config\ncurrent-context: work\ncontexts:\n- name: work\n  context: {cluster: work, user: work}\nclusters:\n- name: work\n  cluster: {server: https://work.example}\nusers:\n- name: work\n  user: {token: t}\n"), 0o600)).To(Succeed())
-		tool("kubectl", `echo "Username  dev@example.test"`)
+		tool(bin, "kubectl", `echo "Username  dev@example.test"`)
 
 		Expect(run("clusters", "auth", "--region", "north1")).To(Succeed())
 		Expect(run("clusters", "auth", "--region", "north1")).To(Succeed())

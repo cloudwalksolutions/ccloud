@@ -3,13 +3,8 @@ package cmd_test
 import (
 	"bytes"
 	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,29 +24,12 @@ var _ = Describe("ccloud app", func() {
 		return cmd.Run(args, out, errs, home, "dev")
 	}
 
-	serve := func(g *fakeGateway) string {
-		server := httptest.NewServer(http.HandlerFunc(g.serve))
-		DeferCleanup(server.Close)
-		return server.URL
-	}
-
 	BeforeEach(func() {
 		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		north = &fakeGateway{hosts: []string{"ci", "boat-105"}}
 		south = &fakeGateway{hosts: []string{"prod"}}
-		home = example
-		home.Regions = append([]cloud.Region{}, example.Regions...)
-		home.Regions[0].Gateway = serve(north)
-		home.Regions[1].Gateway = serve(south)
-
-		bin := GinkgoT().TempDir()
-		GinkgoT().Setenv("PATH", bin)
-		for name, script := range map[string]string{
-			"cloudflared":        `[ "$1 $2" = "access token" ] && echo access-jwt`,
-			"kubectl-oidc_login": `echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`,
-		} {
-			Expect(os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+script+"\n"), 0o755)).To(Succeed())
-		}
+		home = servedBy(north, south)
+		signInTools()
 	})
 
 	It("asks which app outside an app repo", func() {
@@ -144,8 +122,7 @@ var _ = Describe("ccloud app", func() {
 
 		Expect(run("app", "-a", "acme", "--summary")).To(Succeed())
 
-		lines := strings.Split(regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(out.String(), ""), "\n")
-		column := func(line, text string) int { return utf8.RuneCountInString(line[:strings.Index(line, text)]) }
+		lines := strings.Split(plain(out.String()), "\n")
 		Expect(column(lines[1], "https://")).To(Equal(column(lines[0], "ENVIRONMENT")))
 		Expect(column(lines[2], "https://")).To(Equal(column(lines[0], "ENVIRONMENT")))
 	})

@@ -22,10 +22,6 @@ var _ = Describe("ccloud clusters credentials", func() {
 		address string
 	)
 
-	tool := func(name, script string) {
-		Expect(os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+script+"\n"), 0o755)).To(Succeed())
-	}
-
 	freeAddress := func() string {
 		probe, err := net.Listen("tcp", "127.0.0.1:0")
 		Expect(err).NotTo(HaveOccurred())
@@ -46,7 +42,7 @@ var _ = Describe("ccloud clusters credentials", func() {
 		tunnel, err := net.Listen("tcp", address)
 		Expect(err).NotTo(HaveOccurred())
 		DeferCleanup(tunnel.Close)
-		tool("kubectl-oidc_login", `exec /bin/sleep 5`)
+		tool(bin, "kubectl-oidc_login", `exec /bin/sleep 5`)
 		interrupted, interrupt := context.WithCancel(ctx)
 		time.AfterFunc(100*time.Millisecond, interrupt)
 
@@ -59,8 +55,8 @@ var _ = Describe("ccloud clusters credentials", func() {
 		tunnel, err := net.Listen("tcp", address)
 		Expect(err).NotTo(HaveOccurred())
 		DeferCleanup(tunnel.Close)
-		tool("cloudflared", `echo "cloudflared $*" >> `+calls)
-		tool("kubectl-oidc_login", `echo "oidc-login $*" >> `+calls+`; echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
+		tool(bin, "cloudflared", `echo "cloudflared $*" >> `+calls)
+		tool(bin, "kubectl-oidc_login", `echo "oidc-login $*" >> `+calls+`; echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
 
 		Expect(cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")).To(Succeed())
 
@@ -79,8 +75,8 @@ var _ = Describe("ccloud clusters credentials", func() {
 	})
 
 	It("opens the region's tunnel when none is listening, and hands kubectl your token once it is up", func() {
-		tool("cloudflared", `echo "cloudflared $*" >> `+calls+`; exec /bin/sleep 0.5`)
-		tool("kubectl-oidc_login", `echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
+		tool(bin, "cloudflared", `echo "cloudflared $*" >> `+calls+`; exec /bin/sleep 0.5`)
+		tool(bin, "kubectl-oidc_login", `echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
 		go func() {
 			defer GinkgoRecover()
 			Eventually(calls).Should(BeAnExistingFile())
@@ -95,7 +91,7 @@ var _ = Describe("ccloud clusters credentials", func() {
 	})
 
 	It("gives up on a cloudflared that never opens the tunnel, when kubectl stops waiting", func(ctx SpecContext) {
-		tool("cloudflared", `exec /bin/sleep 2`)
+		tool(bin, "cloudflared", `exec /bin/sleep 2`)
 		impatient, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
 		defer cancel()
 
@@ -111,7 +107,7 @@ var _ = Describe("ccloud clusters credentials", func() {
 	})
 
 	It("opens the region's tunnel at the kubeconfig's proxy when none is listening, and says so when cloudflared cannot", func() {
-		tool("cloudflared", `echo "cloudflared $*" >> `+calls+`; exit 1`)
+		tool(bin, "cloudflared", `echo "cloudflared $*" >> `+calls+`; exit 1`)
 
 		err := cmd.Run([]string{"clusters", "credentials", "--region", "north1"}, out, out, example, "dev")
 

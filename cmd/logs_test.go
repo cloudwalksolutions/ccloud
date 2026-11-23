@@ -2,14 +2,10 @@ package cmd_test
 
 import (
 	"bytes"
-	"cmp"
 	"context"
-	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -18,95 +14,6 @@ import (
 	"github.com/cloudwalksolutions/ccloud/cmd"
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 )
-
-type fakeGateway struct {
-	asked     []*http.Request
-	answers   []string
-	refuse    int
-	after     func(asked int)
-	hosts     []string
-	resources string
-	network   string
-	summary   string
-	streams   []reply
-	slow      time.Duration
-	asking    func()
-}
-
-type reply struct {
-	status int
-	body   string
-}
-
-func (g *fakeGateway) serve(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/v1/logs/containers" && g.refuse == 0 {
-		g.asked = append(g.asked, r)
-		_, _ = w.Write([]byte(`{"containers":["api","nginx"]}`))
-		return
-	}
-	if strings.HasSuffix(r.URL.Path, "/resources") && g.refuse == 0 {
-		g.asked = append(g.asked, r)
-		_, _ = w.Write([]byte(cmp.Or(g.resources, `{"environments":[]}`)))
-		return
-	}
-	if strings.HasSuffix(r.URL.Path, "/summary") && g.refuse == 0 {
-		g.asked = append(g.asked, r)
-		time.Sleep(g.slow)
-		_, _ = w.Write([]byte(g.summary))
-		return
-	}
-	if strings.HasSuffix(r.URL.Path, "/network") && g.refuse == 0 {
-		g.asked = append(g.asked, r)
-		_, _ = w.Write([]byte(g.network))
-		return
-	}
-	if app, ok := strings.CutPrefix(r.URL.Path, "/v1/apps/"); ok && g.refuse == 0 {
-		time.Sleep(g.slow)
-		if g.asking != nil {
-			g.asking()
-		}
-		environments := []string{}
-		for _, env := range g.hosts {
-			url := ""
-			if env != "ci" {
-				url = fmt.Sprintf(`,"url":"https://%s.%s.test"`, env, app)
-			}
-			environments = append(environments, fmt.Sprintf(`{"name":%q,"namespace":"%s-%s"%s}`, env, env, app, url))
-		}
-		_, _ = fmt.Fprintf(w, `{"environments":[%s]}`, strings.Join(environments, ","))
-		return
-	}
-	g.asked = append(g.asked, r)
-	if g.after != nil {
-		defer g.after(len(g.asked))
-	}
-	if g.refuse != 0 {
-		http.Error(w, "dev@example.test may not read logs in prod-acme", g.refuse)
-		return
-	}
-	if r.URL.Path == "/v1/logs/stream" {
-		if len(g.streams) == 0 {
-			if g.after != nil {
-				g.after(len(g.asked))
-			}
-			<-r.Context().Done()
-			return
-		}
-		var next reply
-		next, g.streams = g.streams[0], g.streams[1:]
-		if next.status != 0 {
-			http.Error(w, next.body, next.status)
-			return
-		}
-		_, _ = w.Write([]byte(next.body))
-		return
-	}
-	answer := `{"entries":[]}`
-	if len(g.answers) > 0 {
-		answer, g.answers = g.answers[0], g.answers[1:]
-	}
-	_, _ = w.Write([]byte(answer))
-}
 
 var _ = Describe("ccloud logs", func() {
 	var (
@@ -119,23 +26,11 @@ var _ = Describe("ccloud logs", func() {
 		return cmd.Run(args, out, errs, home, "dev")
 	}
 
-	tool := func(bin, name, script string) {
-		Expect(os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+script+"\n"), 0o755)).To(Succeed())
-	}
-
 	BeforeEach(func() {
 		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		gateway = &fakeGateway{}
-		server := httptest.NewServer(http.HandlerFunc(gateway.serve))
-		DeferCleanup(server.Close)
-		home = example
-		home.Regions = append([]cloud.Region{}, example.Regions...)
-		home.Regions[0].Gateway = server.URL
-
-		bin := GinkgoT().TempDir()
-		GinkgoT().Setenv("PATH", bin)
-		tool(bin, "cloudflared", `[ "$1 $2" = "access token" ] && echo access-jwt`)
-		tool(bin, "kubectl-oidc_login", `echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
+		home = servedBy(gateway)
+		signInTools()
 	})
 
 	It("asks which of the app's environments to read", func() {
