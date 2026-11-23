@@ -180,8 +180,8 @@ cannot sign in.
 make check   # lint, build, race tests, coverage gate
 ```
 
-To try a branch against your cloud before it releases, export `GOOGLE_CLIENT_ID` and
-`GOOGLE_CLIENT_SECRET` (the client in [docs/releasing.md](docs/releasing.md)), then `make build`
-and run `./ccloud`. It signs you in as the released ccloud does.
+To try a branch against your cloud before it releases, put `GOOGLE_CLIENT_ID` and
+`GOOGLE_CLIENT_SECRET` (the client in [docs/releasing.md](docs/releasing.md)) in a git-ignored
+`.env`, then `make build` and run `./ccloud`. It signs you in as the released ccloud does.
 
 Every merge to `main` releases: see [docs/releasing.md](docs/releasing.md).

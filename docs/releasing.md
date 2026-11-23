@@ -15,9 +15,14 @@ Actions secrets set by hand with `gh secret set <NAME> -R cloudwalksolutions/ccl
 
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — CloudWalk's Google Desktop OAuth client, the
   audience its API servers trust. Google treats a desktop client's secret as public; it is kept out
-  of the repo only so another cloud's build never carries it. Both are on the client's page under
-  Google Cloud Console → APIs & Services → Credentials; export them to make a local build that
-  signs in.
+  of the repo only so another cloud's build never carries it. The client is under Google Cloud
+  Console → APIs & Services → Credentials, but Google shows its secret only when it is created,
+  and an Actions secret cannot be read back. Every release records it in its build flags, so an
+  installed ccloud gives it back:
+
+  ```bash
+  go version -m "$(which ccloud)" | sed -nE 's/.*ClientSecret=([^ "]+).*/GOOGLE_CLIENT_SECRET=\1/p' >> .env
+  ```
 
 The binary is unsigned; the cask strips the quarantine attribute on install.
 
