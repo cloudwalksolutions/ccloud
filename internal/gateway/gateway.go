@@ -104,8 +104,12 @@ func (g Gateway) Stream(ctx context.Context, query url.Values, each func(Entry) 
 	return "", cmp.Or(lines.Err(), io.ErrUnexpectedEOF)
 }
 
+func (g Gateway) timeout() time.Duration {
+	return cmp.Or(g.Timeout, 15*time.Second)
+}
+
 func (g Gateway) get(ctx context.Context, path *url.URL, what string, into any) error {
-	timeout := cmp.Or(g.Timeout, 15*time.Second)
+	timeout := g.timeout()
 	answering, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	resp, err := g.open(answering, path)

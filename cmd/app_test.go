@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -74,6 +75,14 @@ var _ = Describe("ccloud app", func() {
 
 		Expect(run("app", "-a", "acme", "--summary", "-r", "north1")).To(MatchError(HavePrefix("asking north1 for acme's summary: the gateway answered 502")))
 		Expect(errs.String()).To(Equal("Asking north1 for acme's summary…\n"))
+	})
+
+	It("waits longer for a summary than for other answers, since the gateway builds it from many GitHub calls", func() {
+		home.GatewayTimeout = 100 * time.Millisecond
+		north.slow = 250 * time.Millisecond
+		north.summary = `{"pulls":[],"flow":{},"delivery":{},"ci":[]}`
+
+		Expect(run("app", "-a", "acme", "--summary", "-r", "north1")).To(Succeed())
 	})
 
 	It("says when nothing is open, and marks a draft as a draft", func() {

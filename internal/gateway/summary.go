@@ -53,6 +53,7 @@ type Summary struct {
 func (g Gateway) Summary(ctx context.Context, app string, weeks int) (Summary, error) {
 	var answer Summary
 	query := url.Values{"weeks": {strconv.Itoa(weeks)}}
+	g.Timeout = 4 * g.timeout()
 	err := g.get(ctx, &url.URL{Path: "/v1/apps/" + url.PathEscape(app) + "/summary", RawQuery: query.Encode()}, "a summary", &answer)
 	return answer, err
 }
