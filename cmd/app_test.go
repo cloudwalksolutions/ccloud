@@ -32,6 +32,12 @@ var _ = Describe("ccloud app", func() {
 		signInTools()
 	})
 
+	It("says so when no region runs the app at all", func() {
+		north.hosts, south.hosts = nil, nil
+
+		Expect(run("app", "-a", "ghost")).To(MatchError("no region runs ghost, or you may not read any of its environments"))
+	})
+
 	It("asks which app outside an app repo", func() {
 		Expect(run("app")).To(MatchError("which app? ccloud app --app <app>"))
 	})

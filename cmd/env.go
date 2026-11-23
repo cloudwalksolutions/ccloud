@@ -7,13 +7,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/rest"
 
+	"github.com/cloudwalksolutions/ccloud/internal/app"
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
 	"github.com/cloudwalksolutions/ccloud/internal/dotenv"
 	"github.com/cloudwalksolutions/ccloud/internal/externalsecrets"
@@ -53,9 +53,6 @@ func envPull(c *cobra.Command, home cloud.Cloud) error {
 		return err
 	}
 	env, _ := c.Flags().GetString("env")
-	if slices.Contains(lasting, env) {
-		return fmt.Errorf("env pull copies a feature environment, whose secrets come from the dev project; %s is not one", env)
-	}
 	env, region, err := featureEnv(c, home, app, env)
 	if err != nil {
 		return err
@@ -158,9 +155,9 @@ func signInToGoogle(c *cobra.Command, app string) (string, error) {
 	return token, nil
 }
 
-func read(c *cobra.Command, home cloud.Cloud, app, token string, secrets []externalsecrets.Secret) (vars []dotenv.Var, err error) {
-	done := step(c, fmt.Sprintf("Reading %d of %s's secrets from Google Secret Manager", len(secrets), app))
-	defer func() { done(err, fmt.Sprintf("Read %d of %s's secrets", len(secrets), app)) }()
+func read(c *cobra.Command, home cloud.Cloud, named, token string, secrets []externalsecrets.Secret) (vars []dotenv.Var, err error) {
+	done := step(c, fmt.Sprintf("Reading %d of %s's secrets from Google Secret Manager", len(secrets), named))
+	defer func() { done(err, fmt.Sprintf("Read %d of %s's secrets", len(secrets), named)) }()
 	manager := secretmanager.Client{URL: home.Env.SecretManager, Token: token}
 	vars = make([]dotenv.Var, len(secrets))
 	failures := make([]error, len(secrets))
@@ -185,46 +182,28 @@ func read(c *cobra.Command, home cloud.Cloud, app, token string, secrets []exter
 		}
 	}
 	if len(denied) > 0 {
-		return nil, fmt.Errorf("you may not read %s's %s in %s; ask to be added to %s's developers", app, and(denied), secrets[0].Project, app)
+		return nil, fmt.Errorf("you may not read %s's %s in %s; ask to be added to %s's developers", named, app.And(denied), secrets[0].Project, named)
 	}
 	return vars, nil
 }
 
-func and(names []string) string {
-	last := len(names) - 1
-	if last == 0 {
-		return names[0]
+func featureEnv(c *cobra.Command, home cloud.Cloud, named, env string) (string, cloud.Region, error) {
+	if (app.Environment{Name: env}).Lasting() {
+		return "", cloud.Region{}, fmt.Errorf("env pull copies a feature environment, whose secrets come from the dev project; %s is not one", env)
 	}
-	return strings.Join(names[:last], ", ") + " and " + names[last]
-}
-
-var lasting = []string{"prod", "stage", "ci"}
-
-func featureEnv(c *cobra.Command, home cloud.Cloud, app, env string) (string, cloud.Region, error) {
 	if env != "" {
 		name, _ := c.Flags().GetString("region")
-		region, err := regionFor(c, home, name, app, env)
+		region, err := regionFor(c, home, name, named, env)
 		return env, region, err
 	}
-	environments, err := everyRegionsEnvironments(c, home, app)
+	environments, err := everyRegionsEnvironments(c, home, named)
 	if err != nil {
 		return "", cloud.Region{}, err
 	}
-	var features, hosts []string
-	for _, region := range home.Regions {
-		for _, environment := range environments[region.Name] {
-			if !slices.Contains(lasting, environment.Name) {
-				features = append(features, environment.Name)
-				hosts = append(hosts, region.Name)
-			}
-		}
+	feature, err := environments.Feature()
+	if err != nil {
+		return "", cloud.Region{}, err
 	}
-	switch {
-	case len(features) == 0:
-		return "", cloud.Region{}, fmt.Errorf("no feature environment of %s is running to copy; open a pull request, or name one with -e", app)
-	case len(features) > 1:
-		return "", cloud.Region{}, fmt.Errorf("%s has %d feature environments running, %s; name the one to copy with -e", app, len(features), and(features))
-	}
-	region, err := home.Find(hosts[0])
-	return features[0], region, err
+	region, err := home.Find(feature.Region)
+	return feature.Name, region, err
 }

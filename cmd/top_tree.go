@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cloudwalksolutions/ccloud/internal/app"
 	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
 
@@ -18,12 +19,14 @@ type branch struct {
 	children []*branch
 }
 
-func printTree(out io.Writer, app string, usages []regionUsage, verbose bool) error {
+func printTree(out io.Writer, named string, usages []regionUsage, verbose bool) error {
 	color := paletteFor(out)
-	slices.SortStableFunc(usages, func(a, b regionUsage) int { return byEnvironment(a.usage.Name, b.usage.Name) })
+	slices.SortStableFunc(usages, func(a, b regionUsage) int {
+		return app.Environment{Name: a.usage.Name}.Compare(app.Environment{Name: b.usage.Name})
+	})
 	regions := map[string]bool{}
 	var all tally
-	root := &branch{label: app}
+	root := &branch{label: named}
 	for _, u := range usages {
 		regions[u.region.Name] = true
 	}
@@ -183,26 +186,4 @@ func millicores(cores float64) string {
 		return fmt.Sprintf("%.0fm", cores*1000)
 	}
 	return fmt.Sprintf("%.1f", cores)
-}
-
-func byEnvironment(a, b string) int {
-	rank := func(env string) int {
-		if i := slices.Index([]string{"prod", "stage", "ci"}, env); i >= 0 {
-			return i
-		}
-		return 3
-	}
-	return cmp.Or(cmp.Compare(rank(a), rank(b)), natural(a, b))
-}
-
-func natural(a, b string) int {
-	nameA, numberA := trailingNumber(a)
-	nameB, numberB := trailingNumber(b)
-	return cmp.Or(strings.Compare(nameA, nameB), cmp.Compare(numberA, numberB))
-}
-
-func trailingNumber(name string) (string, int) {
-	prefix := strings.TrimRight(name, "0123456789")
-	number, _ := strconv.Atoi(name[len(prefix):])
-	return prefix, number
 }
