@@ -23,8 +23,8 @@ comes next is in `specs/`.
 - Land work as small, focused pull requests; CI proves validity. Every merge to `main` releases.
 - Edit files only with the Edit/Write tools; never stream edits.
 - Verify behavior with tests, not by hand.
-- Before a PR merges, `make build` it with the OIDC client exported and run its QA steps against
-  the real clusters with `./ccloud`; after it releases, upgrade and run them again.
+- Before a PR merges, run `/live-qa local <app>` against the real clusters; after it releases,
+  `/live-qa brew <app>`. The skill is `.claude/skills/live-qa`.
 - Progress goes to stderr, data to stdout: a wait gets a `step`, and specs give stdout and stderr
   separate buffers.
 - Every table goes through `newTable` (`cmd/table.go`), never `text/tabwriter`, which counts color
