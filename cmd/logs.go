@@ -86,11 +86,10 @@ func readLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 	}
 	follow, _ := c.Flags().GetBool("follow")
 	strict, _ := c.Flags().GetBool("fail-on-match")
-	format, _ := c.Flags().GetString("output")
-	if !slices.Contains([]string{"pretty", "raw", "json"}, format) {
-		return fmt.Errorf("output is pretty, raw or json, not %q", format)
+	printer, err := printerFor(c)
+	if err != nil {
+		return err
 	}
-	printer := logPrinter{out: c.OutOrStdout(), format: format, color: paletteFor(c.OutOrStdout())}
 	done := step(c, fmt.Sprintf("Reading %s's %s logs in %s", app, env, region.Name))
 	page, err := reader.read(query)
 	done(err, fmt.Sprintf("Read %s of %s's %s logs", quantity(len(page.Entries), "line"), app, env))
@@ -112,43 +111,69 @@ func readLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 		if len(entries) > 0 {
 			from = entries[len(entries)-1].Time
 		}
-		return followLogs(c, reader, query, printer, from, strict, app, env, region)
+		return followLogs(c, reader, query, &tail{printer: printer, from: from, printed: map[gateway.Entry]bool{}, strict: strict}, app, env, region)
 	}
+	finishPage(c, page, printer.format)
+	return nil
+}
+
+func printerFor(c *cobra.Command) (logPrinter, error) {
+	format, _ := c.Flags().GetString("output")
+	if !slices.Contains([]string{"pretty", "raw", "json"}, format) {
+		return logPrinter{}, fmt.Errorf("output is pretty, raw or json, not %q", format)
+	}
+	return logPrinter{out: c.OutOrStdout(), format: format, color: paletteFor(c.OutOrStdout())}, nil
+}
+
+func finishPage(c *cobra.Command, page gateway.Page, format string) {
+	entries := page.Entries
 	if format == "json" && len(entries) > 0 {
 		_ = json.NewEncoder(c.OutOrStdout()).Encode(map[string]string{"next": entries[len(entries)-1].Time.Add(time.Nanosecond).UTC().Format(time.RFC3339Nano)})
 	}
 	if page.Truncated {
 		fmt.Fprintf(c.ErrOrStderr(), "Showed the newest %d lines; raise --tail or narrow --since or --until for more.\n", len(entries))
 	}
-	return nil
 }
 
 var errMatched = errors.New("a line matched")
 
-func followLogs(c *cobra.Command, reader *logReader, query url.Values, printer logPrinter, from time.Time, strict bool, app, env string, region cloud.Region) error {
+type tail struct {
+	printer logPrinter
+	from    time.Time
+	printed map[gateway.Entry]bool
+	strict  bool
+	fresh   bool
+}
+
+func (t *tail) take(entry gateway.Entry) error {
+	if t.printed[entry] {
+		return nil
+	}
+	if entry.Time.After(t.from) {
+		t.from, t.printed = entry.Time, map[gateway.Entry]bool{}
+	}
+	t.printed[entry] = true
+	t.printer.print(entry)
+	t.fresh = true
+	if t.strict {
+		return errMatched
+	}
+	return nil
+}
+
+func followLogs(c *cobra.Command, reader *logReader, query url.Values, t *tail, app, env string, region cloud.Region) error {
 	for _, key := range []string{"limit", "direction", "end"} {
 		query.Del(key)
 	}
-	printed := map[gateway.Entry]bool{}
 	wait, signedInAgain := time.Second, false
 	fmt.Fprintln(c.ErrOrStderr(), "Following new lines; Ctrl-C stops.")
 	for {
-		query.Set("start", from.UTC().Format(time.RFC3339Nano))
-		end, err := reader.stream(query, func(entry gateway.Entry) error {
-			if printed[entry] {
-				return nil
-			}
-			if entry.Time.After(from) {
-				from, printed = entry.Time, map[gateway.Entry]bool{}
-			}
-			printed[entry] = true
-			printer.print(entry)
+		query.Set("start", t.from.UTC().Format(time.RFC3339Nano))
+		t.fresh = false
+		end, err := reader.stream(query, t.take)
+		if t.fresh {
 			wait = time.Second
-			if strict {
-				return errMatched
-			}
-			return nil
-		})
+		}
 		var refused gateway.Refused
 		errors.As(err, &refused)
 		switch {
@@ -167,13 +192,20 @@ func followLogs(c *cobra.Command, reader *logReader, query url.Values, printer l
 		case refused.Status >= 400 && refused.Status < 500:
 			return mayNotRead(err, app, env, region)
 		}
-		fmt.Fprintf(c.ErrOrStderr(), "Lost the log stream (%s); reconnecting in %s.\n", cmp.Or(end, fmt.Sprint(err)), wait)
-		select {
-		case <-c.Context().Done():
+		if !waitToReconnect(c, cmp.Or(end, fmt.Sprint(err)), wait) {
 			return nil
-		case <-time.After(wait):
 		}
 		wait = min(2*wait, 30*time.Second)
+	}
+}
+
+func waitToReconnect(c *cobra.Command, lost string, wait time.Duration) bool {
+	fmt.Fprintf(c.ErrOrStderr(), "Lost the log stream (%s); reconnecting in %s.\n", lost, wait)
+	select {
+	case <-c.Context().Done():
+		return false
+	case <-time.After(wait):
+		return true
 	}
 }
 
