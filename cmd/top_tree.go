@@ -1,15 +1,12 @@
 package cmd
 
 import (
-	"cmp"
 	"fmt"
 	"io"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/cloudwalksolutions/ccloud/internal/app"
-	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
 
 type branch struct {
@@ -25,44 +22,18 @@ func printTree(out io.Writer, named string, usages []regionUsage, verbose bool) 
 		return app.Environment{Name: a.usage.Name}.Compare(app.Environment{Name: b.usage.Name})
 	})
 	regions := map[string]bool{}
-	var all tally
-	root := &branch{label: named}
 	for _, u := range usages {
 		regions[u.region.Name] = true
 	}
+	var all tally
+	root := &branch{label: named}
 	for _, u := range usages {
 		label := u.usage.Name
 		if len(regions) > 1 {
 			label += " · " + u.region.Name
 		}
-		var env tally
-		environment := &branch{label: label}
-		for _, w := range workloadsOf(u.usage.Containers) {
-			var load tally
-			var issues []issue
-			workload := &branch{label: w.label}
-			for _, c := range w.containers {
-				load.add(c)
-				issues = append(issues, containerIssues(c)...)
-				if verbose {
-					var one tally
-					one.add(c)
-					cells := one.cells(color)
-					cells[0] = ""
-					workload.children = append(workload.children, &branch{label: c.Pod + "/" + c.Container + " on " + c.Node, cells: cells, issues: color.issues(containerIssues(c))})
-				}
-			}
-			env.merge(load)
-			workload.cells, workload.issues = load.cells(color), color.issues(issues)
-			environment.children = append(environment.children, workload)
-		}
-		for _, n := range u.usage.Nodes {
-			if issues := nodeIssues(n); len(issues) > 0 {
-				environment.children = append(environment.children, &branch{label: n.Name + " (node)", issues: color.issues(issues)})
-			}
-		}
-		environment.cells = env.cells(color)
-		all.merge(env)
+		environment, used := environmentBranch(label, u.usage, color, verbose)
+		all.merge(used)
 		root.children = append(root.children, environment)
 	}
 	root.cells = all.cells(color)
@@ -72,8 +43,46 @@ func printTree(out io.Writer, named string, usages []regionUsage, verbose bool) 
 	if err := table.print(); err != nil || !color {
 		return err
 	}
-	_, err := fmt.Fprintln(out, color.severe(hint, "memory: yellow ≥75% of its limit, red ≥90% · dim: no limit set · -v shows each container"))
+	legend := fmt.Sprintf("memory: yellow ≥%s of its limit, red ≥%s · dim: no limit set · -v shows each container",
+		percent(app.MemoryPressure.Warn), percent(app.MemoryPressure.Bad))
+	_, err := fmt.Fprintln(out, color.severe(app.Hint, legend))
 	return err
+}
+
+func environmentBranch(label string, usage app.Usage, color palette, verbose bool) (*branch, tally) {
+	var used tally
+	environment := &branch{label: label}
+	for _, w := range usage.Workloads() {
+		workload, load := workloadBranch(w, color, verbose)
+		used.merge(load)
+		environment.children = append(environment.children, workload)
+	}
+	for _, n := range usage.Nodes {
+		if issues := n.Issues(); len(issues) > 0 {
+			environment.children = append(environment.children, &branch{label: n.Name + " (node)", issues: color.issues(issues)})
+		}
+	}
+	environment.cells = used.cells(color)
+	return environment, used
+}
+
+func workloadBranch(w app.WorkloadUsage, color palette, verbose bool) (*branch, tally) {
+	var load tally
+	var issues []app.Issue
+	workload := &branch{label: w.Name + " (" + w.Kind + ")"}
+	for _, c := range w.Containers {
+		load.add(c)
+		issues = append(issues, c.Issues()...)
+		if verbose {
+			var one tally
+			one.add(c)
+			cells := one.cells(color)
+			cells[0] = ""
+			workload.children = append(workload.children, &branch{label: c.Pod + "/" + c.Container + " on " + c.Node, cells: cells, issues: color.issues(c.Issues())})
+		}
+	}
+	workload.cells, workload.issues = load.cells(color), color.issues(issues)
+	return workload, load
 }
 
 func (b *branch) render(t *table, lead, indent string, drawn bool) {
@@ -94,34 +103,11 @@ func (b *branch) render(t *table, lead, indent string, drawn bool) {
 	}
 }
 
-type workloadGroup struct {
-	label      string
-	containers []gateway.Container
-}
-
-func workloadsOf(containers []gateway.Container) []workloadGroup {
-	groups := map[string]*workloadGroup{}
-	for _, c := range containers {
-		kind, name := cmp.Or(c.Workload.Kind, "Pod"), cmp.Or(c.Workload.Name, c.Pod)
-		label := name + " (" + kind + ")"
-		if groups[label] == nil {
-			groups[label] = &workloadGroup{label: label}
-		}
-		groups[label].containers = append(groups[label].containers, c)
-	}
-	sorted := make([]workloadGroup, 0, len(groups))
-	for _, g := range groups {
-		sorted = append(sorted, *g)
-	}
-	slices.SortFunc(sorted, func(a, b workloadGroup) int { return strings.Compare(a.label, b.label) })
-	return sorted
-}
-
 type measure struct {
 	used, request, usedOfRequest, limit, usedOfLimit float64
 }
 
-func (m *measure) add(a gateway.Amount) {
+func (m *measure) add(a app.Amount) {
 	m.merge(measure{used: a.Used})
 	if a.Request != nil {
 		m.merge(measure{request: *a.Request, usedOfRequest: a.Used})
@@ -144,7 +130,7 @@ type tally struct {
 	cpu, memory measure
 }
 
-func (t *tally) add(c gateway.Container) {
+func (t *tally) add(c app.Container) {
 	t.merge(tally{pods: map[string]bool{c.Pod: true}})
 	t.cpu.add(c.CPU)
 	t.memory.add(c.Memory)
@@ -178,7 +164,8 @@ func (p palette) pressure(used, limit float64) string {
 	if limit == 0 {
 		return "—"
 	}
-	return p.severe(severityOf(used/limit, 0.75, 0.9), percent(used/limit))
+	severity, _ := app.MemoryPressure.Of(used / limit)
+	return p.severe(severity, percent(used/limit))
 }
 
 func millicores(cores float64) string {
