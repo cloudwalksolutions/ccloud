@@ -114,7 +114,7 @@ func printWeeks(out io.Writer, s gateway.Summary, weeks int) error {
 	table.row("  delivery", fmt.Sprintf("%s; %s from merge to prod", quantity(s.Delivery.Deploys, "prod deploy"), hours(s.Delivery.MergeToProdHours)))
 	for _, ci := range s.CI {
 		table.row("  "+ci.Flow, fmt.Sprintf("%s; median %s; %s pass first time; %s", quantity(ci.Runs, "run"),
-			time.Duration(ci.MedianSeconds*float64(time.Second)), percent(ci.FirstTryPassRate), quantity(ci.Reruns, "rerun")))
+			time.Duration(ci.MedianSeconds*float64(time.Second)).Round(time.Second), percent(ci.FirstTryPassRate), quantity(ci.Reruns, "rerun")))
 	}
 	return table.print()
 }
