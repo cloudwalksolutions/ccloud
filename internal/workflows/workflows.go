@@ -69,7 +69,9 @@ func (r Run) Steps() []Step {
 			steps = append(steps, node)
 		}
 	}
-	slices.SortFunc(steps, func(a, b Step) int { return cmp.Compare(a.startOrder(), b.startOrder()) })
+	slices.SortFunc(steps, func(a, b Step) int {
+		return cmp.Or(cmp.Compare(a.startOrder(), b.startOrder()), strings.Compare(a.DisplayName, b.DisplayName))
+	})
 	return steps
 }
 

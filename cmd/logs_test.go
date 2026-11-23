@@ -81,10 +81,11 @@ var _ = Describe("ccloud logs", func() {
 
 	It("prints the newest lines, then follows the gateway's stream through heartbeats, reconnects and drops, each line once", func(spec SpecContext) {
 		ctx, stop := context.WithCancel(spec)
-		gateway.answers = []string{`{"entries":[{"time":"2026-10-26T07:33:21.5Z","pod":"api-7f9c","container":"api","line":"first"}]}`}
+		first := `{"time":"2026-10-26T07:33:21.5Z","pod":"api-7f9c","container":"api","line":"first"}`
+		gateway.answers = []string{`{"entries":[` + first + `]}`}
 		second := `{"time":"2026-10-26T07:33:22Z","pod":"api-7f9c","container":"api","line":"second"}`
 		gateway.streams = []reply{
-			{body: "{}\n" + second + "\n" + `{"end":"max duration"}` + "\n"},
+			{body: "{}\n" + first + "\n" + second + "\n" + `{"end":"max duration"}` + "\n"},
 			{body: second + "\n" + `{"time":"2026-10-26T07:33:23Z","pod":"api-7f9c","container":"api","line":"third"}` + "\n"},
 		}
 		gateway.after = func(asked int) {

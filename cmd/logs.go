@@ -107,11 +107,14 @@ func readLogs(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 	case strict && len(entries) > 0:
 		return fmt.Errorf("%s matched", quantity(len(entries), "line"))
 	case follow:
-		from := time.Now().UTC()
+		from, printed := time.Now().UTC(), map[gateway.Entry]bool{}
 		if len(entries) > 0 {
 			from = entries[len(entries)-1].Time
 		}
-		return followLogs(c, reader, query, &tail{printer: printer, from: from, printed: map[gateway.Entry]bool{}, strict: strict}, app, env, region)
+		for _, entry := range entries {
+			printed[entry] = entry.Time.Equal(from)
+		}
+		return followLogs(c, reader, query, &tail{printer: printer, from: from, printed: printed, strict: strict}, app, env, region)
 	}
 	finishPage(c, page, printer.format)
 	return nil

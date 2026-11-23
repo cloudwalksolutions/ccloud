@@ -2,6 +2,7 @@ package cmd_test
 
 import (
 	"bytes"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -58,6 +59,19 @@ X unit in 1m18s
 
 To see what failed, try: ccloud workflow logs api-tests-x7k2p -a acme -r north1 --failed
 `))
+	})
+
+	It("lists steps that started at the same moment by name, the same way every time", func() {
+		started := time.Now().Add(-time.Hour).Truncate(time.Second)
+		run := ciRun("api-tests-x7k2p", started).flow("api-tests").finished("Succeeded", time.Minute)
+		for i, name := range []string{"web", "api", "lint", "unit", "docs", "e2e"} {
+			run = run.step(fmt.Sprintf("api-tests-x7k2p-%d", i), name, "Succeeded", started.Add(time.Second), time.Second, "")
+		}
+		ci.workflows("ci-acme", run)
+
+		Expect(cmd.Run([]string{"workflow", "view", "api-tests-x7k2p", "-a", "acme", "-r", "north1"}, out, errs, example, "dev")).To(Succeed())
+
+		Expect(lines(out)[3:9]).To(Equal([]string{"✓ api in 1s", "✓ docs in 1s", "✓ e2e in 1s", "✓ lint in 1s", "✓ unit in 1s", "✓ web in 1s"}))
 	})
 
 	It("colors each result when asked to, as on a terminal", func() {
