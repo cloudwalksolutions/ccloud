@@ -74,11 +74,7 @@ func envPull(c *cobra.Command, home cloud.Cloud) error {
 	force, _ := c.Flags().GetBool("force")
 	merged, changes := dotenv.Merge(string(existing), vars, force)
 	if len(changes.Differ) > 0 {
-		differ := make([]string, len(changes.Differ))
-		for i, d := range changes.Differ {
-			differ[i] = fmt.Sprintf("  %s  %s → %s", d.Name, truncated(d.Was), truncated(d.Is))
-		}
-		return fmt.Errorf("%s differs from %s's %s; pass --force to replace:\n%s", file, app, env, strings.Join(differ, "\n"))
+		return differs(changes, file, fmt.Sprintf("%s's %s", app, env))
 	}
 	err = errors.Join(os.MkdirAll(filepath.Dir(path), 0o755), os.WriteFile(path, []byte(merged), 0o600))
 	if err == nil {
@@ -86,6 +82,14 @@ func envPull(c *cobra.Command, home cloud.Cloud) error {
 		_, err = fmt.Fprint(out, report(paletteFor(out), changes, file, fmt.Sprintf("%s's %s in %s", app, env, region.Name)))
 	}
 	return err
+}
+
+func differs(changes dotenv.Changes, file, source string) error {
+	differ := make([]string, len(changes.Differ))
+	for i, d := range changes.Differ {
+		differ[i] = fmt.Sprintf("  %s  %s → %s", d.Name, truncated(d.Was), truncated(d.Is))
+	}
+	return fmt.Errorf("%s differs from %s; pass --force to replace:\n%s", file, source, strings.Join(differ, "\n"))
 }
 
 func secretsOf(c *cobra.Command, home cloud.Cloud, region cloud.Region, app, env string) (secrets []externalsecrets.Secret, err error) {
