@@ -51,6 +51,7 @@ func (g *fakeGateway) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasSuffix(r.URL.Path, "/summary") && g.refuse == 0 {
 		g.asked = append(g.asked, r)
+		time.Sleep(g.slow)
 		_, _ = w.Write([]byte(g.summary))
 		return
 	}
