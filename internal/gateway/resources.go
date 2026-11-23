@@ -11,10 +11,17 @@ type Amount struct {
 	Limit   *float64 `json:"limit,omitempty"`
 }
 
+type Workload struct {
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+}
+
 type Container struct {
 	Pod       string   `json:"pod"`
 	Container string   `json:"container"`
 	Node      string   `json:"node"`
+	Workload  Workload `json:"workload"`
+	Waiting   string   `json:"waiting,omitempty"`
 	CPU       Amount   `json:"cpu"`
 	Memory    Amount   `json:"memory"`
 	Throttled *float64 `json:"throttled,omitempty"`

@@ -9,8 +9,9 @@ import (
 )
 
 type table struct {
-	out  io.Writer
-	rows [][]string
+	out   io.Writer
+	rows  [][]string
+	right map[int]bool
 }
 
 var colorCodes = regexp.MustCompile(`\x1b\[[0-9;]*m`)
@@ -25,6 +26,13 @@ func newTable(out io.Writer, header ...string) *table {
 		t.rows = append(t.rows, bold)
 	}
 	return t
+}
+
+func (t *table) rightAlign(columns ...int) {
+	t.right = map[int]bool{}
+	for _, column := range columns {
+		t.right[column] = true
+	}
 }
 
 func (t *table) row(cells ...string) {
@@ -45,9 +53,14 @@ func (t *table) print() error {
 	for _, row := range t.rows {
 		var line strings.Builder
 		for i, cell := range row {
+			padding := strings.Repeat(" ", widths[i]-visibleWidth(cell))
+			if t.right[i] {
+				line.WriteString(padding + cell + "  ")
+				continue
+			}
 			line.WriteString(cell)
 			if i < len(row)-1 {
-				line.WriteString(strings.Repeat(" ", widths[i]-visibleWidth(cell)+2))
+				line.WriteString(padding + "  ")
 			}
 		}
 		lines.WriteString(strings.TrimRight(line.String(), " ") + "\n")
