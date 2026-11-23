@@ -8,12 +8,11 @@ import (
 
 	"github.com/cloudwalksolutions/ccloud/internal/app"
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
-	"github.com/cloudwalksolutions/ccloud/internal/gateway"
 )
 
 type regionUsage struct {
 	region cloud.Region
-	usage  gateway.Usage
+	usage  app.Usage
 }
 
 func topCmd(home cloud.Cloud) *cobra.Command {
@@ -60,7 +59,7 @@ func usagesOf(c *cobra.Command, home cloud.Cloud, name, named, env string) (usag
 	defer func() { done(err, fmt.Sprintf("Read what %s uses", named)) }()
 	for _, region := range regions {
 		signedIn, err := sessionOf(c).gateway(c, home, region)
-		var found []gateway.Usage
+		var found []app.Usage
 		if err == nil {
 			found, err = signedIn.Resources(c.Context(), named, env)
 		}
