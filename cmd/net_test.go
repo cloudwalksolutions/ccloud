@@ -3,9 +3,6 @@ package cmd_test
 import (
 	"bytes"
 	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -29,20 +26,8 @@ var _ = Describe("ccloud net", func() {
 	BeforeEach(func() {
 		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		gateway = &fakeGateway{hosts: []string{"prod"}}
-		server := httptest.NewServer(http.HandlerFunc(gateway.serve))
-		DeferCleanup(server.Close)
-		home = example
-		home.Regions = append([]cloud.Region{}, example.Regions...)
-		home.Regions[0].Gateway = server.URL
-
-		bin := GinkgoT().TempDir()
-		GinkgoT().Setenv("PATH", bin)
-		for name, script := range map[string]string{
-			"cloudflared":        `[ "$1 $2" = "access token" ] && echo access-jwt`,
-			"kubectl-oidc_login": `echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`,
-		} {
-			Expect(os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+script+"\n"), 0o755)).To(Succeed())
-		}
+		home = servedBy(gateway)
+		signInTools()
 	})
 
 	It("asks which environment", func() {

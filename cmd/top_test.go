@@ -3,12 +3,7 @@ package cmd_test
 import (
 	"bytes"
 	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"regexp"
 	"strings"
-	"unicode/utf8"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,29 +33,12 @@ var _ = Describe("ccloud top", func() {
 		return cmd.Run(args, out, errs, home, "dev")
 	}
 
-	serve := func(g *fakeGateway) string {
-		server := httptest.NewServer(http.HandlerFunc(g.serve))
-		DeferCleanup(server.Close)
-		return server.URL
-	}
-
 	BeforeEach(func() {
 		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		north = &fakeGateway{}
 		south = &fakeGateway{}
-		home = example
-		home.Regions = append([]cloud.Region{}, example.Regions...)
-		home.Regions[0].Gateway = serve(north)
-		home.Regions[1].Gateway = serve(south)
-
-		bin := GinkgoT().TempDir()
-		GinkgoT().Setenv("PATH", bin)
-		for name, script := range map[string]string{
-			"cloudflared":        `[ "$1 $2" = "access token" ] && echo access-jwt`,
-			"kubectl-oidc_login": `echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`,
-		} {
-			Expect(os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+script+"\n"), 0o755)).To(Succeed())
-		}
+		home = servedBy(north, south)
+		signInTools()
 	})
 
 	It("says so when the app has no environment you may read", func() {
@@ -95,7 +73,7 @@ var _ = Describe("ccloud top", func() {
 
 		Expect(out.String()).To(ContainSubstring("\x1b[31mrestarted 3×\x1b[0m, \x1b[2mno memory limit\x1b[0m"))
 		Expect(out.String()).To(ContainSubstring("\x1b[33mmemory stall 20%\x1b[0m"))
-		lines := strings.Split(strings.TrimSpace(regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(out.String(), "")), "\n")
+		lines := strings.Split(strings.TrimSpace(plain(out.String())), "\n")
 		Expect(lines).To(HaveExactElements(
 			MatchRegexp(`^APP · ENV · WORKLOAD\s+PODS`),
 			MatchRegexp(`^acme\s+2`),
@@ -105,7 +83,6 @@ var _ = Describe("ccloud top", func() {
 			MatchRegexp(`^   └─ node03 \(node\)\s+memory stall 20%$`),
 			Equal("memory: yellow ≥75% of its limit, red ≥90% · dim: no limit set · -v shows each container"),
 		))
-		column := func(line, text string) int { return utf8.RuneCountInString(line[:strings.Index(line, text)]) }
 		Expect(column(lines[0], "PODS")+len("PODS")).To(Equal(column(lines[2], "2 ")+1), "counts end where their header does")
 	})
 

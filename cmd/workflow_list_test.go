@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -104,9 +103,8 @@ var _ = Describe("ccloud workflow list", func() {
 		Expect(run("workflow", "list", "-a", "acme", "-r", "north1")).To(Succeed())
 
 		Expect(out.String()).To(ContainSubstring("\x1b[31mX\x1b[0m"))
-		plain := regexp.MustCompile("\x1b\\[[0-9;]*m").ReplaceAllString(out.String(), "")
-		header, row, _ := strings.Cut(plain, "\n")
-		Expect(strings.Index(row, "api-tests")).To(Equal(strings.Index(header, "FLOW")))
+		lines := strings.Split(plain(out.String()), "\n")
+		Expect(column(lines[1], "api-tests")).To(Equal(column(lines[0], "FLOW")))
 	})
 
 	It("narrows to one flow and pull request, and to the newest few", func() {

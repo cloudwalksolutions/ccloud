@@ -39,29 +39,13 @@ var _ = Describe("ccloud env pull", func() {
 		DeferCleanup(os.Chdir, was)
 	}
 
-	serve := func(g *fakeGateway) string {
-		server := httptest.NewServer(http.HandlerFunc(g.serve))
-		DeferCleanup(server.Close)
-		return server.URL
-	}
-
-	tool := func(name, script string) {
-		Expect(os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+script+"\n"), 0o755)).To(Succeed())
-	}
-
 	BeforeEach(func() {
 		out, errs = &bytes.Buffer{}, &bytes.Buffer{}
 		GinkgoT().Setenv("KUBECONFIG", filepath.Join(GinkgoT().TempDir(), "config"))
 		north = &fakeGateway{hosts: []string{"ci", "stage"}}
 		south = &fakeGateway{hosts: []string{"prod"}}
-		home = example
-		home.Regions = append([]cloud.Region{}, example.Regions...)
-		home.Regions[0].Gateway = serve(north)
-		home.Regions[1].Gateway = serve(south)
-		bin = GinkgoT().TempDir()
-		GinkgoT().Setenv("PATH", bin)
-		tool("cloudflared", `[ "$1 $2" = "access token" ] && echo access-jwt`)
-		tool("kubectl-oidc_login", `echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`)
+		home = servedBy(north, south)
+		bin = signInTools()
 	})
 
 	It("needs the app's repo, which is where the env file goes", func() {
@@ -131,7 +115,7 @@ var _ = Describe("ccloud env pull", func() {
 			server := httptest.NewServer(http.HandlerFunc(secrets.serve))
 			DeferCleanup(server.Close)
 			home.Env.SecretManager = server.URL
-			tool("gcloud", `[ "$*" = "auth application-default print-access-token" ] && echo adc-token`)
+			tool(bin, "gcloud", `[ "$*" = "auth application-default print-access-token" ] && echo adc-token`)
 
 			cluster = newFakeCluster()
 			cluster.signIn("north1")
@@ -167,7 +151,7 @@ var _ = Describe("ccloud env pull", func() {
 		})
 
 		It("signs you in to Google on stderr when it has no credentials for you, then pulls", func() {
-			tool("gcloud", `case "$*" in
+			tool(bin, "gcloud", `case "$*" in
   "auth application-default login") : > "$0.signed-in"; echo "Credentials saved." ;;
   *) [ -f "$0.signed-in" ] && echo adc-token || { echo "Your default credentials were not found." >&2; exit 1; } ;;
 esac`)
@@ -180,7 +164,7 @@ esac`)
 		})
 
 		It("stops rather than signing you in again when Google still refuses you after signing in", func() {
-			tool("gcloud", `case "$*" in
+			tool(bin, "gcloud", `case "$*" in
   "auth application-default login") : > "$0.signed-in" ;;
   *) [ -f "$0.signed-in" ] && echo stale-token || exit 1 ;;
 esac`)
@@ -191,7 +175,7 @@ esac`)
 		})
 
 		It("writes nothing when you do not finish signing in to Google", func() {
-			tool("gcloud", `[ "$*" = "auth application-default login" ] && { echo "Aborted by user." >&2; exit 1; }; exit 1`)
+			tool(bin, "gcloud", `[ "$*" = "auth application-default login" ] && { echo "Aborted by user." >&2; exit 1; }; exit 1`)
 
 			err := run("env", "pull")
 

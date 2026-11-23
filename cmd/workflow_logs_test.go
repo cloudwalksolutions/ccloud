@@ -3,8 +3,6 @@ package cmd_test
 import (
 	"bytes"
 	"net/http"
-	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -36,19 +34,8 @@ var _ = Describe("ccloud workflow logs", func() {
 		ci.signIn("north1")
 
 		gateway = &fakeGateway{}
-		server := httptest.NewServer(http.HandlerFunc(gateway.serve))
-		DeferCleanup(server.Close)
-		home = example
-		home.Regions = append([]cloud.Region{}, example.Regions...)
-		home.Regions[0].Gateway = server.URL
-		bin := GinkgoT().TempDir()
-		GinkgoT().Setenv("PATH", bin)
-		for name, script := range map[string]string{
-			"cloudflared":        `echo access-jwt`,
-			"kubectl-oidc_login": `echo '{"kind":"ExecCredential","status":{"token":"id-token"}}'`,
-		} {
-			Expect(os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+script+"\n"), 0o755)).To(Succeed())
-		}
+		home = servedBy(gateway)
+		signInTools()
 
 		started = time.Now().Add(-10 * time.Minute).Truncate(time.Second)
 		ci.workflows("ci-acme", ciRun("api-tests-x7k2p", started).flow("api-tests").finished("Failed", 2*time.Minute).
