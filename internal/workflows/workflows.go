@@ -76,9 +76,13 @@ func (r Run) Steps() []Step {
 }
 
 func (r Run) Name() string { return r.Metadata.Name }
-func (r Run) Flow() string { return r.Metadata.Labels["flow"] }
-func (r Run) PR() string   { return r.Metadata.Labels["pr"] }
-func (r Run) SHA() string  { return r.Metadata.Labels["sha"] }
+func (r Run) Flow() string {
+	template, _ := r.Spec["workflowTemplateRef"].(map[string]any)
+	name, _ := template["name"].(string)
+	return cmp.Or(r.Metadata.Labels["flow"], name)
+}
+func (r Run) PR() string  { return r.Metadata.Labels["pr"] }
+func (r Run) SHA() string { return r.Metadata.Labels["sha"] }
 
 func (r Run) Branch() string {
 	arguments, _ := r.Spec["arguments"].(map[string]any)
@@ -163,8 +167,17 @@ func (r Runs) Rerun(ctx context.Context, run Run) (string, error) {
 	return r.create(ctx, map[string]any{"generateName": run.Metadata.GenerateName, "labels": labels}, spec)
 }
 
-func (r Runs) Submit(ctx context.Context, template string) (string, error) {
-	return r.create(ctx, map[string]any{"generateName": template + "-"}, map[string]any{"workflowTemplateRef": map[string]any{"name": template}})
+type Parameter struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+func (r Runs) Submit(ctx context.Context, template string, parameters ...Parameter) (string, error) {
+	spec := map[string]any{"workflowTemplateRef": map[string]any{"name": template}}
+	if len(parameters) > 0 {
+		spec["arguments"] = map[string]any{"parameters": parameters}
+	}
+	return r.create(ctx, map[string]any{"generateName": template + "-"}, spec)
 }
 
 func (r Runs) create(ctx context.Context, metadata, spec map[string]any) (string, error) {

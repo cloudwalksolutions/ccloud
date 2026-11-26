@@ -22,10 +22,12 @@ type Cloud struct {
 }
 
 type Database struct {
-	Primary string
-	Port    int
-	Secret  string
-	Reset   string
+	Primary   string
+	Port      int
+	Secret    string
+	Reset     string
+	Backup    string
+	Container string
 }
 
 type Env struct {

@@ -43,6 +43,11 @@ func (w workflow) label(key, value string) workflow {
 
 func (w workflow) flow(name string) workflow { return w.label("flow", name) }
 
+func (w workflow) from(template string) workflow {
+	w["spec"].(map[string]any)["workflowTemplateRef"] = map[string]any{"name": template}
+	return w
+}
+
 func (w workflow) pr(number, sha, branch string) workflow {
 	arguments := w["spec"].(map[string]any)["arguments"].(map[string]any)
 	arguments["parameters"] = append(arguments["parameters"].([]any), map[string]any{"name": "revision", "value": branch})
@@ -98,11 +103,15 @@ type fakeCluster struct {
 	pods       map[string][]corev1.Pod
 	forwarded  chan string
 	objects    map[string]any
+	answers    map[string]string
+	complaints map[string]string
+	execs      []string
 }
 
 func newFakeCluster() *fakeCluster {
 	f := &fakeCluster{byNS: map[string][]workflow{}, forbidden: map[string]bool{}, logs: map[string]string{}, unwritable: map[string]bool{},
-		secrets: map[string]map[string]string{}, pods: map[string][]corev1.Pod{}, forwarded: make(chan string, 10), objects: map[string]any{}}
+		secrets: map[string]map[string]string{}, pods: map[string][]corev1.Pod{}, forwarded: make(chan string, 10), objects: map[string]any{},
+		answers: map[string]string{}, complaints: map[string]string{}}
 	f.server = httptest.NewTLSServer(http.HandlerFunc(f.serve))
 	DeferCleanup(f.server.Close)
 	return f
@@ -226,6 +235,8 @@ func (f *fakeCluster) serveCore(w http.ResponseWriter, r *http.Request, namespac
 		f.status(w, http.StatusForbidden, metav1.StatusReasonForbidden, `pods "`+rest[0]+`" is forbidden: User "dev@example.test" cannot create resource "pods/portforward"`)
 	case kind == "pods" && len(rest) == 2 && rest[1] == "portforward":
 		f.portForward(w, r, namespace+"/"+rest[0])
+	case kind == "pods" && len(rest) == 2 && rest[1] == "exec":
+		f.serveExec(w, r, namespace+"/"+rest[0])
 	default:
 		f.status(w, http.StatusNotFound, metav1.StatusReasonNotFound, kind+` "`+strings.Join(rest, "/")+`" not found`)
 	}
@@ -256,6 +267,64 @@ func (f *fakeCluster) portForward(w http.ResponseWriter, r *http.Request, pod st
 				_, _ = io.Copy(stream, stream)
 				_ = stream.Close()
 			}()
+		case <-connection.CloseChan():
+			return
+		}
+	}
+}
+
+func (f *fakeCluster) exec(pod, stdout string) {
+	f.answers[pod] = stdout
+}
+
+func (f *fakeCluster) execFails(pod, stderr string) {
+	f.complaints[pod] = stderr
+}
+
+func (f *fakeCluster) serveExec(w http.ResponseWriter, r *http.Request, pod string) {
+	query := r.URL.Query()
+	f.execs = append(f.execs, pod+" "+query.Get("container")+": "+strings.Join(query["command"], " "))
+	if _, err := httpstream.Handshake(r, w, []string{"v4.channel.k8s.io"}); err != nil {
+		return
+	}
+	streams := make(chan httpstream.Stream)
+	connection := spdy.NewResponseUpgrader().UpgradeResponse(w, r, func(stream httpstream.Stream, _ <-chan struct{}) error {
+		streams <- stream
+		return nil
+	})
+	if connection == nil {
+		return
+	}
+	defer func() { _ = connection.Close() }()
+	var failures httpstream.Stream
+	written := 0
+	finish := func() {
+		if written < 2 || failures == nil {
+			return
+		}
+		if complaint, ok := f.complaints[pod]; ok {
+			_ = json.NewEncoder(failures).Encode(metav1.Status{Status: metav1.StatusFailure, Message: "command terminated with exit code 1: " + complaint})
+		}
+		_ = failures.Close()
+	}
+	for {
+		select {
+		case stream := <-streams:
+			switch stream.Headers().Get("streamType") {
+			case "stdout":
+				_, _ = io.WriteString(stream, f.answers[pod])
+				_ = stream.Close()
+				written++
+			case "stderr":
+				_, _ = io.WriteString(stream, f.complaints[pod])
+				_ = stream.Close()
+				written++
+			case "error":
+				failures = stream
+			default:
+				_ = stream.Close()
+			}
+			finish()
 		case <-connection.CloseChan():
 			return
 		}

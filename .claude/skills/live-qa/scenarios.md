@@ -32,6 +32,15 @@ environments.
 - A note appears when `--tail` cut lines off.
 - Following (`-f`) for a minute shows each line once.
 
+## Back up before a risky change
+`$CC db backup -a <app> -e stage --note "live qa"` (stage only; it adds a backup and changes
+nothing else).
+- Progress goes to stderr, and stdout ends with the backup's label, "just now", a size with its
+  unit, and the note.
+- The label is the newest in `pgbackrest info --stanza=db` run in the stage primary's `database`
+  container, with the note as its annotation.
+- A note with a quote in it is refused before anything is submitted.
+
 ## Scripts and pipes
 `$CC top -a <app> >out 2>err`, `$CC net -a <app> | cat`,
 `$CC logs -a <app> -e prod --since 10m -o json`.
