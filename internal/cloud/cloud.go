@@ -29,6 +29,7 @@ type Database struct {
 	Backup    string
 	Fetch     string
 	Fetched   string
+	Restore   string
 	Container string
 	Offsite   Offsite
 }

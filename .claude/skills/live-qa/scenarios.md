@@ -49,6 +49,16 @@ the region stage runs in (it only copies the off-site backups back into that reg
   container; a backup taken with `db backup` is off-site at once.
 - `--from` lists the same backups as the region's own, all off-site.
 
+## Put stage back the way it was
+`$CC db backup -a <app> -e stage --note "live qa restore"`, then
+`$CC db restore -a <app> -e stage --dangerously-restore` (stage only; backing up first means the
+restore loses nothing).
+- The restore names the backup just taken, and every step succeeds: restore, restored, settle,
+  restart.
+- The app's API pod becomes ready again, and `$CC db backups -a <app> -e stage` still lists the
+  history.
+- Without `--dangerously-restore` and no terminal, it refuses and changes nothing.
+
 ## Scripts and pipes
 `$CC top -a <app> >out 2>err`, `$CC net -a <app> | cat`,
 `$CC logs -a <app> -e prod --since 10m -o json`.
