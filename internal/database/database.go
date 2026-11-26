@@ -9,12 +9,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	batchv1client "k8s.io/client-go/kubernetes/typed/batch/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
@@ -30,6 +33,7 @@ type Credentials struct {
 
 type Database struct {
 	core      *corev1client.CoreV1Client
+	batch     *batchv1client.BatchV1Client
 	transport http.RoundTripper
 	upgrader  spdy.Upgrader
 	namespace string
@@ -38,8 +42,28 @@ type Database struct {
 
 func In(cfg *rest.Config, namespace string, where cloud.Database) (Database, error) {
 	core, coreErr := corev1client.NewForConfig(cfg)
+	batch, batchErr := batchv1client.NewForConfig(cfg)
 	transport, upgrader, spdyErr := spdy.RoundTripperFor(cfg)
-	return Database{core: core, transport: transport, upgrader: upgrader, namespace: namespace, where: where}, errors.Join(coreErr, spdyErr)
+	return Database{core: core, batch: batch, transport: transport, upgrader: upgrader, namespace: namespace, where: where}, errors.Join(coreErr, batchErr, spdyErr)
+}
+
+func (d Database) CopiedOffsite(ctx context.Context) (time.Time, error) {
+	jobs, err := d.batch.Jobs(d.where.Offsite.Namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return time.Time{}, err
+	}
+	var copied time.Time
+	for _, job := range jobs.Items {
+		if !slices.ContainsFunc(job.OwnerReferences, func(o metav1.OwnerReference) bool { return o.Kind == "CronJob" && o.Name == d.where.Offsite.CronJob }) {
+			continue
+		}
+		for _, condition := range job.Status.Conditions {
+			if condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue && job.Status.StartTime != nil && job.Status.StartTime.After(copied) {
+				copied = job.Status.StartTime.Time
+			}
+		}
+	}
+	return copied, nil
 }
 
 func (d Database) Credentials(ctx context.Context) (Credentials, error) {

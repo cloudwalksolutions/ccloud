@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -85,6 +86,23 @@ func runCmd(home cloud.Cloud, command *cobra.Command, action runAction) *cobra.C
 		}
 		return action(c, region, app, runs, run)
 	})
+}
+
+func runWorkflow(c *cobra.Command, out io.Writer, region cloud.Region, app, namespace, template, following string, parameters ...workflows.Parameter) error {
+	runs, err := connect(region, func(cfg *rest.Config) (workflows.Runs, error) { return workflows.In(cfg, namespace) })
+	var name string
+	if err == nil {
+		name, err = runs.Submit(c.Context(), template, parameters...)
+	}
+	var run workflows.Run
+	if err == nil {
+		fmt.Fprintf(c.ErrOrStderr(), "Submitted %s; %s.\n", name, following)
+		run, err = getRun(c, runs, region, app, name)
+	}
+	if err == nil {
+		err = follow(c, out, region, app, runs, run, 3*time.Second, true)
+	}
+	return err
 }
 
 func getRun(c *cobra.Command, runs workflows.Runs, region cloud.Region, app, name string) (workflows.Run, error) {

@@ -38,7 +38,10 @@ func Cloud() cloud.Cloud {
 			Secret:    "crunchydb-pguser-crunchydb",
 			Reset:     "db-reset",
 			Backup:    "db-backup",
+			Fetch:     "db-fetch",
+			Fetched:   "--repo2-path=/restore/%s/%s/crunchydb/repo2",
 			Container: "database",
+			Offsite:   cloud.Offsite{Namespace: "s3", CronJob: "offsite"},
 		},
 		Env: cloud.Env{
 			Deployment:    "api-dep",

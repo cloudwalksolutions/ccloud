@@ -27,7 +27,15 @@ type Database struct {
 	Secret    string
 	Reset     string
 	Backup    string
+	Fetch     string
+	Fetched   string
 	Container string
+	Offsite   Offsite
+}
+
+type Offsite struct {
+	Namespace string
+	CronJob   string
 }
 
 type Env struct {

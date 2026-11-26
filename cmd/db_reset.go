@@ -4,14 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/rest"
 
 	"github.com/cloudwalksolutions/ccloud/internal/cloud"
-	"github.com/cloudwalksolutions/ccloud/internal/workflows"
 )
 
 func dbResetCmd(home cloud.Cloud) *cobra.Command {
@@ -34,19 +31,8 @@ func dbReset(c *cobra.Command, home cloud.Cloud, region cloud.Region, app string
 			return err
 		}
 	}
-	runs, err := connect(region, func(cfg *rest.Config) (workflows.Runs, error) { return workflows.In(cfg, env+"-"+app) })
-	if err != nil {
-		return err
-	}
-	name, err := runs.Submit(c.Context(), home.Database.Reset)
-	var run workflows.Run
-	if err == nil {
-		fmt.Fprintf(c.ErrOrStderr(), "Submitted %s; following it until the database is migrated and seeded again. Ctrl-C stops watching, not the reset.\n", name)
-		run, err = getRun(c, runs, region, app, name)
-	}
-	if err == nil {
-		err = follow(c, region, app, runs, run, 3*time.Second, true)
-	}
+	err := runWorkflow(c, c.OutOrStdout(), region, app, env+"-"+app, home.Database.Reset,
+		"following it until the database is migrated and seeded again. Ctrl-C stops watching, not the reset")
 	if apierrors.IsForbidden(err) {
 		err = fmt.Errorf("you may not reset %s's %s database in %s", app, env, region.Name)
 	}

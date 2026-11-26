@@ -16,7 +16,7 @@ const clearScreen = "\x1b[H\x1b[2J"
 func workflowWatch(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs, run workflows.Run) error {
 	interval, _ := c.Flags().GetDuration("interval")
 	strict, _ := c.Flags().GetBool("exit-status")
-	return follow(c, region, app, runs, run, interval, strict)
+	return follow(c, c.OutOrStdout(), region, app, runs, run, interval, strict)
 }
 
 func printChanges(out io.Writer, run workflows.Run, phases map[string]string) {
@@ -28,8 +28,7 @@ func printChanges(out io.Writer, run workflows.Run, phases map[string]string) {
 	}
 }
 
-func follow(c *cobra.Command, region cloud.Region, app string, runs workflows.Runs, run workflows.Run, interval time.Duration, strict bool) error {
-	out := c.OutOrStdout()
+func follow(c *cobra.Command, out io.Writer, region cloud.Region, app string, runs workflows.Runs, run workflows.Run, interval time.Duration, strict bool) error {
 	redraw := terminal(out)
 	phases := map[string]string{}
 	var err error

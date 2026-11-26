@@ -231,8 +231,8 @@ func (f *fakeCluster) serveCore(w http.ResponseWriter, r *http.Request, namespac
 			}
 		}
 		_ = json.NewEncoder(w).Encode(list)
-	case kind == "pods" && len(rest) == 2 && rest[1] == "portforward" && f.unwritable[namespace]:
-		f.status(w, http.StatusForbidden, metav1.StatusReasonForbidden, `pods "`+rest[0]+`" is forbidden: User "dev@example.test" cannot create resource "pods/portforward"`)
+	case kind == "pods" && len(rest) == 2 && f.unwritable[namespace]:
+		f.status(w, http.StatusForbidden, metav1.StatusReasonForbidden, `pods "`+rest[0]+`" is forbidden: User "dev@example.test" cannot create resource "pods/`+rest[1]+`"`)
 	case kind == "pods" && len(rest) == 2 && rest[1] == "portforward":
 		f.portForward(w, r, namespace+"/"+rest[0])
 	case kind == "pods" && len(rest) == 2 && rest[1] == "exec":
