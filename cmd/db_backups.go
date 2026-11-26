@@ -39,18 +39,7 @@ func dbBackups(c *cobra.Command, home cloud.Cloud, region cloud.Region, app stri
 func listBackups(c *cobra.Command, home cloud.Cloud, region cloud.Region, app, env string) error {
 	from, _ := c.Flags().GetString("from")
 	namespace := env + "-" + app
-	var options []string
-	if from != "" {
-		if _, err := home.Find(from); err != nil {
-			return err
-		}
-		fetched := fmt.Sprintf("following it until %s's off-site copy of the backups is here. Ctrl-C stops watching, not the fetch", from)
-		if err := runWorkflow(c, c.ErrOrStderr(), region, app, namespace, home.Database.Fetch, fetched, workflows.Parameter{Name: "from", Value: from}); err != nil {
-			return err
-		}
-		options = append(options, fmt.Sprintf(home.Database.Fetched, from, namespace))
-	}
-	db, backups, err := backupsOf(c, home, region, app, env, options...)
+	db, backups, err := backupsFrom(c, home, region, app, env, from)
 	if err != nil {
 		return err
 	}
@@ -74,6 +63,21 @@ func listBackups(c *cobra.Command, home cloud.Cloud, region cloud.Region, app, e
 		table.row(backup.Label, backup.Type, age(time.Since(backup.Finished)), memory(float64(backup.Stored)), backup.Note, offsite)
 	}
 	return table.print()
+}
+
+func backupsFrom(c *cobra.Command, home cloud.Cloud, region cloud.Region, app, env, from string) (database.Database, []database.Backup, error) {
+	if from == "" {
+		return backupsOf(c, home, region, app, env)
+	}
+	if _, err := home.Find(from); err != nil {
+		return database.Database{}, nil, err
+	}
+	namespace := env + "-" + app
+	fetched := fmt.Sprintf("following it until %s's off-site copy of the backups is here. Ctrl-C stops watching, not the fetch", from)
+	if err := runWorkflow(c, c.ErrOrStderr(), region, app, namespace, home.Database.Fetch, fetched, workflows.Parameter{Name: "from", Value: from}); err != nil {
+		return database.Database{}, nil, err
+	}
+	return backupsOf(c, home, region, app, env, fmt.Sprintf(home.Database.Fetched, from, namespace))
 }
 
 func copiedOffsite(c *cobra.Command, home cloud.Cloud, region cloud.Region, db database.Database, namespace string) (time.Time, error) {

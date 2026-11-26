@@ -167,6 +167,18 @@ whether it is off-site yet. `--from` lists the backups another region copied off
 them into this region first, such as before moving the environment here. Only admins may list
 stage's and prod's backups.
 
+```sh
+ccloud db restore -e stage
+ccloud db restore -e stage --backup 20261126-175333F
+ccloud db restore -e stage --from south1
+```
+
+Replaces an environment's database with one of its backups, the newest unless `--backup` names
+one, then restarts the app on it. Everything written since that backup is lost, so it asks you
+to type the environment's name first; `--dangerously-restore` skips that. `--from` restores a
+backup another region copied off-site, which is how an environment's data moves with it. Only
+admins may restore stage and prod, and prod is preceded by a caution.
+
 ## Env
 
 ```sh

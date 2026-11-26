@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,11 +41,5 @@ func confirmReset(c *cobra.Command, region cloud.Region, app, env string) error 
 	if !terminal(c.InOrStdin()) {
 		return fmt.Errorf("resetting drops %s's %s database in %s; pass --dangerously-reset to reset it without confirming", app, env, region.Name)
 	}
-	fmt.Fprintf(c.OutOrStdout(), "This drops every table in %s's %s database in %s, then migrates and seeds it from scratch.\nType %s to reset it: ", app, env, region.Name, env)
-	typed, _ := bufio.NewReader(c.InOrStdin()).ReadString('\n')
-	typed = strings.TrimSpace(typed)
-	if typed != env {
-		return fmt.Errorf("you typed %q, not %q; nothing was reset", typed, env)
-	}
-	return nil
+	return typeToConfirm(c, env, "reset", "reset", fmt.Sprintf("This drops every table in %s's %s database in %s, then migrates and seeds it from scratch.", app, env, region.Name))
 }

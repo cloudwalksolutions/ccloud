@@ -39,6 +39,7 @@ func Cloud() cloud.Cloud {
 			Reset:     "db-reset",
 			Backup:    "db-backup",
 			Fetch:     "db-fetch",
+			Restore:   "db-restore",
 			Fetched:   "--repo2-path=/restore/%s/%s/crunchydb/repo2",
 			Container: "database",
 			Offsite:   cloud.Offsite{Namespace: "s3", CronJob: "offsite"},
