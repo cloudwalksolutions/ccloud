@@ -37,26 +37,15 @@ func dbBackup(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 	if env == "prod" {
 		cautionAboutProd(c.ErrOrStderr(), app)
 	}
-	runs, err := connect(region, func(cfg *rest.Config) (workflows.Runs, error) { return workflows.In(cfg, env+"-"+app) })
-	var name string
-	if err == nil {
-		name, err = runs.Submit(c.Context(), home.Database.Backup, workflows.Parameter{Name: "note", Value: note})
-	}
-	var run workflows.Run
-	if err == nil {
-		fmt.Fprintf(c.ErrOrStderr(), "Submitted %s; following it until the backup is off-site. Ctrl-C stops watching, not the backup.\n", name)
-		run, err = getRun(c, runs, region, app, name)
-	}
-	if err == nil {
-		err = follow(c, region, app, runs, run, 3*time.Second, true)
-	}
+	err := runWorkflow(c, c.OutOrStdout(), region, app, env+"-"+app, home.Database.Backup,
+		"following it until the backup is off-site. Ctrl-C stops watching, not the backup", workflows.Parameter{Name: "note", Value: note})
 	if apierrors.IsForbidden(err) {
 		err = fmt.Errorf("you may not back up %s's %s database in %s", app, env, region.Name)
 	}
 	if err != nil {
 		return err
 	}
-	backups, err := backupsOf(c, home, region, app, env)
+	_, backups, err := backupsOf(c, home, region, app, env)
 	if err != nil {
 		return err
 	}
@@ -64,16 +53,17 @@ func dbBackup(c *cobra.Command, home cloud.Cloud, region cloud.Region, app strin
 	return printBackup(c.OutOrStdout(), backups[len(backups)-1])
 }
 
-func backupsOf(c *cobra.Command, home cloud.Cloud, region cloud.Region, app, env string, options ...string) ([]database.Backup, error) {
+func backupsOf(c *cobra.Command, home cloud.Cloud, region cloud.Region, app, env string, options ...string) (database.Database, []database.Backup, error) {
 	db, err := connect(region, func(cfg *rest.Config) (database.Database, error) { return database.In(cfg, env+"-"+app, home.Database) })
 	var pod string
 	if err == nil {
 		pod, err = db.Primary(c.Context())
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%s's %s database has %w in %s", app, env, err, region.Name)
+		return db, nil, fmt.Errorf("%s's %s database has %w in %s", app, env, err, region.Name)
 	}
-	return db.Backups(c.Context(), pod, options...)
+	backups, err := db.Backups(c.Context(), pod, options...)
+	return db, backups, err
 }
 
 func printBackup(out io.Writer, backup database.Backup) error {

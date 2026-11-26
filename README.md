@@ -157,6 +157,16 @@ Backs an environment's database up in full, now, copies the backup off-site, and
 it took: its label, when it finished, its size and your note. Only admins may back up stage and
 prod, and prod is preceded by a caution; feature environments keep no backups.
 
+```sh
+ccloud db backups -e stage
+ccloud db backups -e stage --from south1
+```
+
+Lists an environment's backups, newest first, with each one's label, type, age, size, note, and
+whether it is off-site yet. `--from` lists the backups another region copied off-site, fetching
+them into this region first, such as before moving the environment here. Only admins may list
+stage's and prod's backups.
+
 ## Env
 
 ```sh

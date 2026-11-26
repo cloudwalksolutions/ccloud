@@ -41,6 +41,14 @@ nothing else).
   container, with the note as its annotation.
 - A note with a quote in it is refused before anything is submitted.
 
+## Which backups can I restore?
+`$CC db backups -a <app> -e stage`, then `$CC db backups -a <app> -e stage --from <region>` naming
+the region stage runs in (it only copies the off-site backups back into that region's S3).
+- stdout is the table alone, newest first; the fetch's progress goes to stderr.
+- The labels and notes match `pgbackrest info --stanza=db` in the stage primary's `database`
+  container; a backup taken with `db backup` is off-site at once.
+- `--from` lists the same backups as the region's own, all off-site.
+
 ## Scripts and pipes
 `$CC top -a <app> >out 2>err`, `$CC net -a <app> | cat`,
 `$CC logs -a <app> -e prod --since 10m -o json`.

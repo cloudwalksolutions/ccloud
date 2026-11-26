@@ -55,8 +55,10 @@ func exampleCloud() cloud.Cloud {
 			{Name: "north1", Host: "k8s.north1.example.test", Port: 17001},
 			{Name: "south1", Host: "k8s.south1.example.test", Port: 17002},
 		},
-		Database: cloud.Database{Primary: "role=primary", Port: 5432, Secret: "db-owner", Reset: "db-reset", Backup: "db-backup", Container: "database"},
-		Env:      cloud.Env{Deployment: "web", Container: "server", File: "src/api/.env"},
+		Database: cloud.Database{Primary: "role=primary", Port: 5432, Secret: "db-owner", Reset: "db-reset", Backup: "db-backup", Container: "database",
+			Fetch: "db-fetch", Fetched: "--repo2-path=/restore/%s/%s/crunchydb/repo2",
+			Offsite: cloud.Offsite{Namespace: "s3", CronJob: "offsite"}},
+		Env: cloud.Env{Deployment: "web", Container: "server", File: "src/api/.env"},
 	}
 }
 
