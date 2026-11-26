@@ -45,12 +45,14 @@ var _ = Describe("the cloudwalk cloud", func() {
 		Expect(cloudwalk.Cloud().AppDir()).To(Equal(".cloudwalk"))
 	})
 
-	It("tunnels to the leader of each environment's Postgres cluster, as its owner, the one secret developers may read", func() {
+	It("tunnels to the leader of each environment's Postgres cluster, as its owner, and backs it up and reads its backups through pgBackRest beside it", func() {
 		Expect(cloudwalk.Cloud().Database).To(Equal(cloud.Database{
-			Primary: "postgres-operator.crunchydata.com/cluster=crunchydb,postgres-operator.crunchydata.com/role=master",
-			Port:    5432,
-			Secret:  "crunchydb-pguser-crunchydb",
-			Reset:   "db-reset",
+			Primary:   "postgres-operator.crunchydata.com/cluster=crunchydb,postgres-operator.crunchydata.com/role=master",
+			Port:      5432,
+			Secret:    "crunchydb-pguser-crunchydb",
+			Reset:     "db-reset",
+			Backup:    "db-backup",
+			Container: "database",
 		}))
 	})
 

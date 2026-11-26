@@ -149,6 +149,14 @@ its API, following the run until it ends. It asks you to type the environment's 
 `--dangerously-reset` skips that, and without a terminal it is required. Developers may reset feature environments; only
 admins may reset stage, and no one can reset prod.
 
+```sh
+ccloud db backup -e stage --note "before the migration"
+```
+
+Backs an environment's database up in full, now, copies the backup off-site, and shows the backup
+it took: its label, when it finished, its size and your note. Only admins may back up stage and
+prod, and prod is preceded by a caution; feature environments keep no backups.
+
 ## Env
 
 ```sh
